@@ -166,19 +166,19 @@ vazamento.
 
 ---
 
-### M3 — [ ] Configuração `.gitsafety.yml`
+### M3 — [x] Configuração `.gitsafety.yml`
 
 **Objetivo:** permitir ajuste sem manual — três chaves e nada mais.
 
 **Definition of done:**
 
-- [ ] `ignore` (globs), `allow` (valores/regex) e `rules` (`id` + `pattern`)
+- [x] `ignore` (globs), `allow` (valores/regex) e `rules` (`id` + `pattern`)
       implementadas (PRD FR-12, FR-13, FR-8).
-- [ ] Comentário `# gitsafety: allow` suprime o finding daquela linha (PRD FR-14).
-- [ ] YAML malformado ou regex que não compila → exit 2 apontando arquivo e linha,
+- [x] Comentário `# gitsafety: allow` suprime o finding daquela linha (PRD FR-14).
+- [x] YAML malformado ou regex que não compila → exit 2 apontando arquivo e linha,
       coberto por **teste negativo** que verifica a mensagem, não só que levanta erro.
-- [ ] Sem arquivo de config, a ferramenta funciona com os padrões embutidos (PRD FR-22).
-- [ ] `--config PATH` aponta outro arquivo.
+- [x] Sem arquivo de config, a ferramenta funciona com os padrões embutidos (PRD FR-22).
+- [x] `--config PATH` aponta outro arquivo.
 
 **Dependências:** M2.
 
