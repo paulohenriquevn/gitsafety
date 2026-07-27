@@ -22,10 +22,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from gitsafety.errors import GitsafetyError
 from gitsafety.finding import Finding
 from gitsafety.git import run_git
 from gitsafety.rules import BUILTIN_RULES, Rule
 from gitsafety.scanner import ScanResult, is_allowed
+from gitsafety.walker import MAX_FILE_BYTES
 
 if TYPE_CHECKING:  # evita ciclo em runtime; `config` importa deste módulo
     from gitsafety.config import Config
@@ -164,31 +166,74 @@ def _is_ignored_path(path: Path, ignore) -> bool:
     return any(fnmatch.fnmatch(path.as_posix(), padrao) for padrao in ignore)
 
 
-def scan_staged(
-    cwd: Path,
+#: Acima de quanto um arquivo BINÁRIO deixa de ser varrido no index.
+#:
+#: O teto é sobre binário, não sobre bytes. Copiar o limite de tamanho do `scan` para o
+#: hook seria a saída óbvia e errada: um `.env` de 2 MB com uma credencial deixaria de
+#: bloquear o commit, e isso é perda de cobertura no único caminho que não pode perder.
+#:
+#: Quem decide o que é binário é o **git**, não uma heurística nossa — `--numstat` marca
+#: esses arquivos com `-` no lugar da contagem de linhas. Usar a decisão dele torna o teto
+#: explicável ao usuário ("binário acima de 1 MB") e consistente com o `scan`, que já pula
+#: binário por extensão e qualquer arquivo acima deste mesmo limite.
+#:
+#: A primeira versão contava bytes das linhas do diff e **não funcionava**: 5 MB de arquivo
+#: viram 703 KB depois do diff, então o teto nunca era cruzado. Media a quantidade errada.
+#:
+#: E o pulo é REPORTADO. É o que separa este teto do fail-open que o M5 corrigiu: lá o git
+#: escondia o conteúdo sem avisar ninguém.
+_TETO_BINARIO_BYTES = MAX_FILE_BYTES
+
+
+def _binarios_grandes(cwd: Path) -> list[Path]:
+    """Arquivos que o git considera binários e que passam do teto, pelo tamanho no index."""
+    grandes: list[Path] = []
+    for linha in run_git(["diff", "--staged", "--numstat"], cwd=cwd).splitlines():
+        partes = linha.split("\t", 2)
+        # `-` no lugar da contagem de linhas é como o git marca binário.
+        if len(partes) != 3 or partes[0] != "-":
+            continue
+        caminho = _decode_path(partes[2])
+        try:
+            tamanho = int(run_git(["cat-file", "-s", f":{caminho}"], cwd=cwd))
+        except (GitsafetyError, ValueError):
+            # Caminho que o git não resolve (arquivo removido, por exemplo): na dúvida,
+            # varre. Pular por engano seria falso negativo; varrer por engano custa tempo.
+            continue
+        if tamanho > _TETO_BINARIO_BYTES:
+            grandes.append(Path(caminho))
+    return grandes
+
+
+def scan_staged_diff(
+    diff: str,
     rules: Sequence[Rule] = BUILTIN_RULES,
     *,
     config: Config | None = None,
+    pular: Sequence[Path] = (),
 ) -> ScanResult:
-    """Varre o índice e devolve o mesmo `ScanResult` do `scan` de arquivos (ADR D9).
+    """Varre um diff já obtido. Existe separada para ser testável sem repositório.
 
-    Reusar o tipo é o que garante que `cli.render` mascare o segredo neste caminho sem
-    nenhuma linha nova — o mascaramento mora no `Finding` justamente para que um caminho
-    de saída novo não possa esquecê-lo.
-
-    `skipped` é sempre vazio aqui: o git já decide o que entra no diff, então não há
-    decisão de pulo nossa a reportar.
+    `scan_staged` e o caminho do histórico compartilham esta função — o mesmo diff, o mesmo
+    matcher, o mesmo teto. Duplicar aqui garantiria divergência na primeira mudança, e o M4
+    mediu o preço de dois caminhos sobre a mesma coisa.
     """
     from gitsafety.config import Config, effective_rules
+    from gitsafety.walker import SkippedFile, SkipReason
 
     cfg = config if config is not None else Config()
     regras = effective_rules(cfg, rules)
 
     findings: list[Finding] = []
+    a_pular = set(pular)
+    pulados = [SkippedFile(path=caminho, reason=SkipReason.TOO_LARGE) for caminho in pular]
 
-    for adicionada in parse_added_lines(staged_diff(cwd)):
+    for adicionada in parse_added_lines(diff):
         if _is_ignored_path(adicionada.path, cfg.ignore):
             continue
+        if adicionada.path in a_pular:
+            continue
+
         for rule in regras:
             for match in rule.pattern.finditer(adicionada.text):
                 # O hook é onde o falso positivo dói mais — a config precisa valer aqui
@@ -204,4 +249,23 @@ def scan_staged(
                     )
                 )
 
-    return ScanResult(findings=findings, skipped=[])
+    return ScanResult(findings=findings, skipped=pulados)
+
+
+def scan_staged(
+    cwd: Path,
+    rules: Sequence[Rule] = BUILTIN_RULES,
+    *,
+    config: Config | None = None,
+) -> ScanResult:
+    """Varre o índice e devolve o mesmo `ScanResult` do `scan` de arquivos (ADR D9).
+
+    Reusar o tipo é o que garante que `cli.render` mascare o segredo neste caminho sem
+    nenhuma linha nova — o mascaramento mora no `Finding` justamente para que um caminho
+    de saída novo não possa esquecê-lo.
+
+    `skipped` traz o que o teto de binário deixou de fora — nunca vazio por construção.
+    """
+    return scan_staged_diff(
+        staged_diff(cwd), rules, config=config, pular=_binarios_grandes(cwd)
+    )

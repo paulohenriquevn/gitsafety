@@ -15,6 +15,9 @@ porque o finding existe.
 
 from __future__ import annotations
 
+import os
+import subprocess
+
 import pytest
 
 from gitsafety.staged import parse_added_lines, scan_staged
@@ -213,3 +216,87 @@ def test_path_is_decoded_as_the_user_sees_it(linha_diff, esperado):
     """
     diff = "\n".join([linha_diff, "@@ -0,0 +1 @@", "+k = 'valor'"])
     assert parse_added_lines(diff)[0].path.as_posix() == esperado
+
+
+# --- Teto de custo por arquivo binário (issue #5) --------------------------------
+#
+# Os testes são de COMPORTAMENTO ponta a ponta, com repositório de verdade: quem decide o
+# que é binário é o git (`--numstat` marca com `-`), e testar contra um diff sintético
+# testaria a minha ideia do formato, não o formato.
+
+
+def _repo(tmp_path):
+    def git(*a):
+        subprocess.run(["git", "-C", str(tmp_path), *a], check=True, capture_output=True)
+
+    git("init", "-q", ".")
+    git("config", "user.email", "t@exemplo.com")
+    git("config", "user.name", "Teste")
+    return git
+
+
+def test_large_binary_is_skipped_and_reported(tmp_path):
+    """Binário grande custa caro e quase nunca carrega credencial casável.
+
+    O pulo passa pelo contrato que o M0 estabeleceu (`ScanResult.skipped`): um arquivo não
+    varrido **nunca some em silêncio**. É a diferença entre este teto e o fail-open que o
+    M5 corrigiu — lá o git escondia o conteúdo sem avisar ninguém.
+    """
+    from gitsafety.walker import MAX_FILE_BYTES, SkipReason
+
+    git = _repo(tmp_path)
+    (tmp_path / "modelo.bin").write_bytes(os.urandom(MAX_FILE_BYTES + 1000))
+    git("add", "-A")
+
+    resultado = scan_staged(tmp_path)
+
+    assert [(s.path.as_posix(), s.reason) for s in resultado.skipped] == [
+        ("modelo.bin", SkipReason.TOO_LARGE)
+    ]
+
+
+def test_large_text_file_is_still_scanned(tmp_path):
+    """TEXTO grande continua sendo varrido, por maior que seja.
+
+    Copiar o teto de tamanho do `scan` para o hook era a saída óbvia e errada: um `.env` de
+    2 MB com uma credencial deixaria de bloquear o commit. Isso é perda de cobertura no
+    único caminho que não pode perder. O teto vale para o que o git chama de BINÁRIO.
+    """
+    from gitsafety.walker import MAX_FILE_BYTES
+
+    git = _repo(tmp_path)
+    enchimento = "x = 1\n" * (MAX_FILE_BYTES // 5)
+    (tmp_path / "grande.env").write_text(f"{enchimento}AWS='{SECRET}'\n", encoding="utf-8")
+    git("add", "-A")
+
+    resultado = scan_staged(tmp_path)
+
+    assert resultado.skipped == []
+    assert [f.secret for f in resultado.findings] == [SECRET]
+
+
+def test_small_binary_is_still_scanned(tmp_path):
+    """Binário pequeno é barato — pular seria perder cobertura sem ganhar nada."""
+    git = _repo(tmp_path)
+    (tmp_path / "pequeno.bin").write_bytes(f"\x00AWS={SECRET}\n".encode())
+    git("add", "-A")
+
+    resultado = scan_staged(tmp_path)
+
+    assert resultado.skipped == []
+    assert [f.secret for f in resultado.findings] == [SECRET]
+
+
+def test_a_skipped_binary_does_not_hide_a_secret_in_another_file(tmp_path):
+    """O pulo é por arquivo. O resto do commit continua sendo verificado."""
+    from gitsafety.walker import MAX_FILE_BYTES
+
+    git = _repo(tmp_path)
+    (tmp_path / "modelo.bin").write_bytes(os.urandom(MAX_FILE_BYTES + 1000))
+    (tmp_path / "app.py").write_text(f"AWS = '{SECRET}'\n", encoding="utf-8")
+    git("add", "-A")
+
+    resultado = scan_staged(tmp_path)
+
+    assert [f.secret for f in resultado.findings] == [SECRET]
+    assert len(resultado.skipped) == 1
