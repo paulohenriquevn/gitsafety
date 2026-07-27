@@ -117,20 +117,20 @@ exit code correto.
 
 ---
 
-### M1 — [ ] Hook de pre-commit — *a partir daqui já protege*
+### M1 — [x] Hook de pre-commit — *a partir daqui já protege*
 
 **Objetivo:** um comando instala o hook, e o commit que contém segredo é bloqueado.
 
 **Definition of done:**
 
-- [ ] `gitsafety install` escreve `.git/hooks/pre-commit` executável chamando
+- [x] `gitsafety install` escreve `.git/hooks/pre-commit` executável chamando
       `gitsafety scan --staged`.
-- [ ] Hook `pre-commit` já existente → **recusa**, exit 2, e imprime a linha a adicionar
+- [x] Hook `pre-commit` já existente → **recusa**, exit 2, e imprime a linha a adicionar
       manualmente. Nunca sobrescreve (PRD FR-2).
-- [ ] `gitsafety scan --staged` lê o **conteúdo em stage**, não o arquivo em disco.
-- [ ] Teste de integração: repositório git temporário, `git commit` com segredo é
+- [x] `gitsafety scan --staged` lê o **conteúdo em stage**, não o arquivo em disco.
+- [x] Teste de integração: repositório git temporário, `git commit` com segredo é
       bloqueado; `git commit --no-verify` passa.
-- [ ] Fora de um repositório git → mensagem específica e exit 2 (PRD NFR-5).
+- [x] Fora de um repositório git → mensagem específica e exit 2 (PRD NFR-5).
 
 **Dependências:** M0.
 
