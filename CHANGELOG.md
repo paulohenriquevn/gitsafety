@@ -16,6 +16,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Changed
 
+- **O hook agora aponta a célula do notebook**, igual ao `gitsafety scan`. Antes ele dizia
+  `analise.ipynb:14` — a linha do JSON, que não existe quando você abre o arquivo no
+  Jupyter — enquanto o `scan` já dizia `célula 2 (código)` (#6)
 - **Commit com pasta de assets ficou mais rápido.** Arquivo que o git considera binário e
   passa de 1 MB deixa de ser verificado no commit — e o pulo **aparece na saída**, como já
   acontece no `gitsafety scan`. Medido: 30 MB de assets caem de 5,7 s para 2,2 s. Arquivo

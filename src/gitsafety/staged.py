@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING
 from gitsafety.errors import GitsafetyError
 from gitsafety.finding import Finding
 from gitsafety.git import run_git
+from gitsafety.notebook import is_notebook
 from gitsafety.rules import BUILTIN_RULES, Rule
 from gitsafety.scanner import ScanResult, is_allowed
 from gitsafety.walker import MAX_FILE_BYTES
@@ -266,6 +267,65 @@ def scan_staged(
 
     `skipped` traz o que o teto de binário deixou de fora — nunca vazio por construção.
     """
-    return scan_staged_diff(
+    resultado = scan_staged_diff(
         staged_diff(cwd), rules, config=config, pular=_binarios_grandes(cwd)
     )
+    return _com_localizacao_de_notebook(resultado, cwd, rules, config=config)
+
+
+def _com_localizacao_de_notebook(
+    resultado: ScanResult,
+    cwd: Path,
+    rules: Sequence[Rule],
+    *,
+    config: Config | None,
+) -> ScanResult:
+    """Troca a linha do JSON pela célula, nos achados que estão em notebook.
+
+    O ADR D5 do M4 decidiu que `--staged` NÃO parsearia notebooks, e estava certo naquele
+    momento: mapear a linha do diff de volta para a célula exigiria um segundo caminho de
+    varredura, e o M4 gastou cinco rodadas de review consertando defeitos nascidos
+    exatamente disso.
+
+    O M5 mudou o cálculo. `scanner._localise` já pareia achado bruto com achado de notebook
+    **pela linha do arquivo**, e é o que o `--history` usa. Reusá-lo aqui não cria caminho
+    novo: a varredura continua sendo uma só, e o parsing apenas melhora a localização.
+
+    O conteúdo vem do **index** (`git show :caminho`), não do disco: o hook verifica o que
+    está sendo commitado, e o arquivo em disco pode já ter sido editado depois do `git add`.
+
+    Custo: uma chamada ao git por notebook **que tenha achado**. Notebook sem segredo não
+    paga nada.
+    """
+    from gitsafety.config import effective_rules
+    from gitsafety.scanner import _localise, _scan_notebook
+
+    if not resultado.findings:
+        return resultado
+
+    from gitsafety.config import Config as _Config
+
+    cfg = config if config is not None else _Config()
+    regras = effective_rules(cfg, rules)
+
+    por_arquivo: dict[Path, list[Finding]] = {}
+    for finding in resultado.findings:
+        por_arquivo.setdefault(finding.path, []).append(finding)
+
+    localizados: list[Finding] = []
+    for caminho, achados in por_arquivo.items():
+        if not is_notebook(caminho):
+            localizados.extend(achados)
+            continue
+        try:
+            bruto = run_git(["show", f":{caminho}"], cwd=cwd)
+        except GitsafetyError:
+            # Caminho que o git não resolve no index: fica com a localização bruta, que é
+            # pior mas nunca silêncio.
+            localizados.extend(achados)
+            continue
+        localizados.extend(
+            _localise(achados, _scan_notebook(bruto, caminho, regras, cfg.allow), bruto, regras)
+        )
+
+    return ScanResult(findings=localizados, skipped=resultado.skipped)

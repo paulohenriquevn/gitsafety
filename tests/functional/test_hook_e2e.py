@@ -14,6 +14,7 @@ from __future__ import annotations
 import pytest
 
 from gitsafety.hook import install_hook
+from gitsafety.staged import scan_staged
 
 SECRET = "AKIAIOSFODNN7EXAMPLE"
 
@@ -128,3 +129,76 @@ def test_commit_is_actually_prevented_not_just_reported(tmp_git_repo, stage, git
     # Assert — nenhum commit no repositório.
     contagem = run_git(["rev-list", "--all", "--count"], cwd=tmp_git_repo)
     assert contagem == "0"
+
+
+# --- Notebook no hook: mesma localização do scan (issue #6) ----------------------
+
+
+def test_staged_notebook_finding_reports_the_cell(tmp_git_repo, stage):
+    """O hook e o `scan` precisam dizer a mesma coisa sobre o mesmo arquivo.
+
+    O ADR D5 do M4 decidiu que `--staged` não parsearia notebooks, e estava certo NAQUELE
+    momento: mapear a linha do diff de volta para a célula exigiria um segundo caminho de
+    varredura, e o M4 gastou cinco rodadas de review consertando defeitos que nasceram
+    exatamente disso.
+
+    O M5 mudou o cálculo. `scanner._localise` já pareia achado bruto com achado de notebook
+    **pela linha do arquivo** — o mecanismo existe, é usado pelo `--history`, e reusá-lo
+    aqui não cria caminho novo nenhum.
+    """
+    import json
+
+    notebook = {
+        "cells": [
+            {"cell_type": "code", "source": ["import os\n"], "metadata": {}, "outputs": []},
+            {
+                "cell_type": "code",
+                "source": [f'AWS = "{SECRET}"\n'],
+                "metadata": {},
+                "outputs": [],
+            },
+        ],
+        "metadata": {},
+        "nbformat": 4,
+        "nbformat_minor": 5,
+    }
+    stage("analise.ipynb", json.dumps(notebook, indent=1))
+
+    resultado = scan_staged(tmp_git_repo)
+
+    assert len(resultado.findings) == 1
+    assert "célula 2" in str(resultado.findings[0].path)
+
+
+def test_staged_and_scan_agree_on_a_notebook(tmp_git_repo, stage):
+    """A propriedade que a issue #6 pede: os dois alvos não divergem."""
+    import json
+
+    from gitsafety.scanner import scan_path
+
+    notebook = {
+        "cells": [
+            {
+                "cell_type": "code",
+                "source": ["x = 1\n", f'k = "{SECRET}"\n'],
+                "metadata": {},
+                "outputs": [],
+            }
+        ],
+        "metadata": {},
+        "nbformat": 4,
+        "nbformat_minor": 5,
+    }
+    stage("nb.ipynb", json.dumps(notebook, indent=1))
+
+    # Compara a parte que descreve a LOCALIZAÇÃO dentro do arquivo. O prefixo difere por
+    # desenho: `--staged` usa caminho relativo à raiz do repositório, `scan` usa o caminho
+    # que recebeu. Essa diferença é anterior ao notebook e não é o que a issue #6 aponta.
+    def localizacao(f):
+        return str(f.path).split("::", 1)[1].strip() if "::" in str(f.path) else ""
+
+    do_hook = {localizacao(f) for f in scan_staged(tmp_git_repo).findings}
+    do_scan = {localizacao(f) for f in scan_path(tmp_git_repo).findings}
+
+    assert do_hook == do_scan, (do_hook, do_scan)
+    assert do_hook == {"célula 1 (código)"}

@@ -2,7 +2,7 @@
 
 Itens conhecidos, não silenciosos. Cada um traz de onde veio e por que ficou de fora.
 
-## B1 — O hook reporta a linha do JSON em notebook; o `scan` reporta a célula
+## B1 — RESOLVIDO: o hook passou a reportar a célula, como o `scan`
 
 **Origem:** validação de integração do M4 (2026-07-27).
 
@@ -21,8 +21,14 @@ de código, com risco próprio de divergir do primeiro.
 **Impacto:** cosmético. O hook **bloqueia corretamente** (validado: exit 1, zero commits),
 que é a função dele. O usuário roda `gitsafety scan` para saber onde está.
 
-**Quando revisitar:** se o uso mostrar que a mensagem do hook confunde. Antes disso, seria
-otimização especulativa.
+**Fechado na issue #6.** O que mudou o cálculo foi o M5: `scanner._localise` já pareia
+achado bruto com achado de notebook **pela linha do arquivo**, e é o que o `--history` usa.
+Reusá-lo no `--staged` não cria caminho de varredura novo — o parsing apenas melhora a
+localização de um achado que a varredura já produziu.
+
+O conteúdo vem do **index** (`git show :caminho`), não do disco: o hook verifica o que está
+sendo commitado, e o arquivo pode ter sido editado depois do `git add`. Custo: uma chamada
+ao git por notebook **que tenha achado**.
 
 ## B2 — RESOLVIDO: família `keyword_assignment` acrescentada ao catálogo
 
