@@ -17,8 +17,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from gitsafety.rules import BUILTIN_RULES
-from gitsafety.scanner import _scan_text, scan_path
+from gitsafety.scanner import scan_path
 
 #: Uma célula de notebook de análise real: importe, chamada, e uma saída de algumas linhas.
 _CELULA_FONTE = [
@@ -66,19 +65,27 @@ def _cronometrar(fn) -> float:
 
 
 def measure_notebook(n_cells: int, rounds: int = 3) -> dict[str, float]:
-    """Mede os dois caminhos sobre o **mesmo** notebook.
+    """Mede os dois caminhos sobre o **mesmo** conteúdo, variando só a extensão.
 
-    `parsed_s` percorre `scan_path`, que bifurca por extensão. `text_s` chama `_scan_text`
-    diretamente sobre o mesmo conteúdo — é exatamente o que o v0.4.0 fazia.
+    Os dois lados passam por `scan_path`: mesma travessia, mesma leitura, mesmas 53 regras.
+    A única diferença é o `.ipynb` vs `.txt`, que é o que decide se o parsing entra.
+
+    A primeira versão comparava `scan_path` (com travessia e leitura) contra `_scan_text`
+    (conteúdo já em memória) e chamava isso de pareado. O viés era contra o parsing, então
+    a conclusão se sustentava — mas a razão publicada não era a que a docstring descrevia,
+    e um número que não mede o que diz medir não é evidência.
     """
     bruto = _build_notebook(n_cells)
 
     with tempfile.TemporaryDirectory() as tmp:
-        alvo = Path(tmp) / "analise.ipynb"
-        alvo.write_text(bruto, encoding="utf-8")
+        como_notebook = Path(tmp) / "nb" / "analise.ipynb"
+        como_texto = Path(tmp) / "txt" / "analise.txt"
+        for alvo in (como_notebook, como_texto):
+            alvo.parent.mkdir()
+            alvo.write_text(bruto, encoding="utf-8")
 
-        parsed_s = _melhor(lambda: scan_path(alvo), rounds)
-        text_s = _melhor(lambda: _scan_text(bruto, alvo, BUILTIN_RULES), rounds)
+        parsed_s = _melhor(lambda: scan_path(como_notebook), rounds)
+        text_s = _melhor(lambda: scan_path(como_texto), rounds)
 
     return {
         "n_cells": float(n_cells),

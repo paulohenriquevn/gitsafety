@@ -58,6 +58,81 @@ def test_v3_input_key_is_accepted():
     assert segs and segs[0].text == "x = 1\n"
 
 
+def test_real_v3_notebook_keeps_cell_localisation():
+    """Um v3 REAL guarda as células em `worksheets[]`, não no topo.
+
+    O teste anterior montava um híbrido que não existe — container v4 com chave v3 — e
+    passava validando ficção: em v3 conforme ao schema, `input` nunca era alcançado, e o
+    notebook inteiro caía na degradação para texto. O segredo era achado, mas sem a
+    localização por célula, que é justamente o valor deste milestone.
+    """
+    v3 = json.dumps(
+        {
+            "nbformat": 3,
+            "nbformat_minor": 0,
+            "metadata": {},
+            "worksheets": [
+                {
+                    "cells": [
+                        {
+                            "cell_type": "code",
+                            "input": ["x = 1\n"],
+                            "outputs": [],
+                            "language": "python",
+                        }
+                    ]
+                }
+            ],
+        }
+    )
+    segs = parse_notebook(v3)
+    assert segs is not None, "v3 real não pode cair na degradação"
+    assert segs[0].cell_index == 1
+    assert segs[0].text == "x = 1\n"
+
+
+def test_input_is_read_when_source_is_present_but_empty():
+    """A parada é por conteúdo: `source: []` presente não pode esconder o `input`."""
+    celula = {"cell_type": "code", "source": [], "input": ["k = 1\n"], "metadata": {}}
+    segs = parse_notebook(_nb([celula]))
+    assert segs and segs[0].text == "k = 1\n"
+
+
+def test_traceback_lines_are_joined_with_newline():
+    """`traceback` é array de LINHAS no schema, sem `\n` — juntar sem separador as gruda.
+
+    A colagem fundia o fim de um valor com o começo da linha seguinte, e o delimitador de
+    fim dos padrões deixava de casar: falso negativo por concatenação.
+    """
+    out = {
+        "output_type": "error",
+        "ename": "ValueError",
+        "evalue": "x",
+        "traceback": ["  chamada(", "    token=abc", "ValueError: bad"],
+    }
+    segs = parse_notebook(_nb([_code(["x\n"], [out])]))
+    texto = next(s.text for s in segs if s.origin == OUTPUT_ORIGIN)
+    assert texto.splitlines() == ["  chamada(", "    token=abc", "ValueError: bad"]
+
+
+def test_multiple_outputs_in_one_cell_are_distinguishable():
+    """Duas saídas na mesma célula precisam ser localizáveis separadamente."""
+    saidas = [
+        {"output_type": "stream", "name": "stdout", "text": ["a\n"]},
+        {"output_type": "stream", "name": "stderr", "text": ["b\n"]},
+    ]
+    segs = [
+        s for s in parse_notebook(_nb([_code(["x\n"], saidas)])) if s.origin == OUTPUT_ORIGIN
+    ]
+    locais = {s.locate(Path("nb.ipynb")) for s in segs}
+    assert len(locais) == 2, locais
+
+
+def test_deeply_nested_json_degrades_instead_of_raising():
+    """`RecursionError` derrubava a varredura dos DEMAIS arquivos do diretório."""
+    assert parse_notebook("[" * 60_000 + "]" * 60_000) is None
+
+
 def test_split_value_is_rejoined():
     """O ÚNICO FALSO NEGATIVO MEDIDO no blueprint.
 
@@ -159,7 +234,13 @@ def test_non_dict_cell_is_skipped_without_aborting():
 
 
 def test_output_without_text_plain_produces_no_segment():
-    """Saída só com imagem: base64 de PNG não é segredo, e varrê-la seria ruído."""
+    """A extração NÃO cobre todo mime — e isso é seguro só porque o texto também é varrido.
+
+    A afirmação aqui é sobre **segmentos**, não sobre cobertura. Ler este teste como
+    "saída sem `text/plain` não precisa ser verificada" foi o erro que deixou passar
+    `text/html`; a garantia de cobertura vive em `test_notebook_coverage_oracle.py`, que
+    afirma a relação entre os dois caminhos em vez de enumerar formatos.
+    """
     out = {"output_type": "display_data", "data": {"image/png": "iVBOR"}, "metadata": {}}
     segs = parse_notebook(_nb([_code(["x\n"], [out])]))
     assert [s for s in segs if s.origin == OUTPUT_ORIGIN] == []

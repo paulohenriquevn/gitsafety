@@ -7,6 +7,7 @@ interface (`rules/architecture.md § 1`).
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -138,6 +139,47 @@ def _scan_notebook(
     return findings
 
 
+def _merge_notebook(
+    do_notebook: list[Finding] | None,
+    do_texto: list[Finding],
+) -> list[Finding]:
+    """Combina os dois caminhos de modo que o parsing **nunca** cubra menos que o texto.
+
+    O parsing existe para localizar melhor — dizer "célula 4 (saída)" em vez de "linha 50",
+    que não existe quando o notebook é aberto no Jupyter. Ele NÃO existe para decidir o que
+    é varrido.
+
+    A distinção importa porque a extração é necessariamente uma lista: `source`, `input`, e
+    os tipos de saída que conhecemos. Toda lista de formatos conhecidos é uma lista
+    desatualizada — `text/html`, `application/json`, `attachments`, `metadata` do papermill,
+    um `output_type` que o Jupyter ainda vai inventar. Enumerar o que cobrir transforma cada
+    lacuna de memória em falso negativo silencioso, que é a única falha inaceitável neste
+    produto.
+
+    Então o texto é sempre varrido, e o parseado só **enriquece**: cada achado do texto é
+    consumido por um achado localizado equivalente, e o que sobra entra com a localização
+    bruta. Pior localização é infinitamente melhor que silêncio.
+
+    A contagem é por ocorrência, não por conjunto: o mesmo segredo em duas células são dois
+    achados, e colapsá-los esconderia um dos lugares onde ele precisa ser removido.
+    """
+    if do_notebook is None:
+        # JSON não parseou. O texto já foi varrido — degradação para o comportamento dos
+        # milestones anteriores, que é um estado conhecido (ADR D4).
+        return do_texto
+
+    cobertos = Counter((f.rule_id, f.secret) for f in do_notebook)
+    extras = []
+    for finding in do_texto:
+        chave = (finding.rule_id, finding.secret)
+        if cobertos[chave]:
+            cobertos[chave] -= 1
+        else:
+            extras.append(finding)
+
+    return do_notebook + extras
+
+
 def scan_path(
     root: Path,
     rules: Sequence[Rule] = BUILTIN_RULES,
@@ -159,13 +201,12 @@ def scan_path(
     findings: list[Finding] = []
     for path in files:
         bruto = _read_text(path)
+        do_texto = _scan_text(bruto, path, regras, cfg.allow)
         if is_notebook(path):
-            do_notebook = _scan_notebook(bruto, path, regras, cfg.allow)
-            if do_notebook is not None:
-                findings.extend(do_notebook)
-                continue
-            # `None` = JSON não parseou: cai para texto, que é o comportamento dos
-            # milestones anteriores. Degradação para estado conhecido (ADR D4).
-        findings.extend(_scan_text(bruto, path, regras, cfg.allow))
+            findings.extend(
+                _merge_notebook(_scan_notebook(bruto, path, regras, cfg.allow), do_texto)
+            )
+        else:
+            findings.extend(do_texto)
 
     return ScanResult(findings=findings, skipped=skipped)

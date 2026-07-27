@@ -38,11 +38,16 @@ _CODE_KEYS = ("source", "input")
 #:
 #: É uma **tabela de dados**, não uma cadeia de `if`, para que um tipo novo do formato seja
 #: uma linha e não um ramo.
-_OUTPUT_TEXT_PATHS: dict[str, tuple[tuple[str, ...], ...]] = {
-    "stream": (("text",),),
-    "execute_result": (("data", "text/plain"),),
-    "display_data": (("data", "text/plain"),),
-    "error": (("traceback",), ("evalue",)),
+#: O separador faz parte do extrator porque o formato mistura duas convenções. `source` e
+#: `stream.text` são `multiline_string` no schema — os elementos já trazem o `\n`, e juntar
+#: com um inseriria quebra onde não há. `traceback` é `array of string`, uma entrada por
+#: linha e SEM `\n`: juntar sem separador gruda `token=AKIA...` em `ValueError`, e o
+#: delimitador de fim de padrão deixa de casar — falso negativo por concatenação.
+_OUTPUT_TEXT_PATHS: dict[str, tuple[tuple[tuple[str, ...], str], ...]] = {
+    "stream": ((("text",), ""),),
+    "execute_result": ((("data", "text/plain"), ""),),
+    "display_data": ((("data", "text/plain"), ""),),
+    "error": ((("traceback",), "\n"), (("evalue",), "")),
 }
 
 CODE_ORIGIN = "código"
@@ -56,6 +61,7 @@ class Segment:
     text: str
     cell_index: int  # 1-based, na ordem do arquivo
     origin: str  # CODE_ORIGIN ou OUTPUT_ORIGIN
+    ordinal: int = 0  # >0 numera saídas da mesma célula, que senão seriam indistinguíveis
 
     def locate(self, path: Path) -> str:
         """Localização legível: o que o usuário precisa para achar o segredo no Jupyter.
@@ -64,14 +70,15 @@ class Segment:
         caminho, e incluí-lo aqui produzia `linha 1:1` na saída. A linha vem do `Finding`,
         que é onde ela pertence; aqui fica só o que o `Finding` não sabe representar.
         """
-        return f"{path} :: célula {self.cell_index} ({self.origin})"
+        sufixo = f" {self.ordinal}" if self.ordinal else ""
+        return f"{path} :: célula {self.cell_index} ({self.origin}{sufixo})"
 
 
 def is_notebook(path: Path) -> bool:
     return path.suffix.lower() == ".ipynb"
 
 
-def _as_text(valor: object) -> str:
+def _as_text(valor: object, sep: str = "") -> str:
     """Normaliza para texto o que o formato permite ser lista **ou** string.
 
     `source` e `text` são listas de linhas na prática, mas o formato aceita string, e
@@ -85,7 +92,7 @@ def _as_text(valor: object) -> str:
     if isinstance(valor, str):
         return valor
     if isinstance(valor, list):
-        return "".join(item for item in valor if isinstance(item, str))
+        return sep.join(item for item in valor if isinstance(item, str))
     return ""
 
 
@@ -109,14 +116,39 @@ def _segments_from_outputs(outputs: object, cell_index: int) -> list[Segment]:
         return []
 
     segmentos: list[Segment] = []
-    for saida in outputs:
+    for ordem, saida in enumerate(outputs, start=1):
         if not isinstance(saida, dict):
             continue
-        for caminho in _OUTPUT_TEXT_PATHS.get(saida.get("output_type", ""), ()):
-            texto = _as_text(_dig(saida, caminho))
+        for caminho, sep in _OUTPUT_TEXT_PATHS.get(saida.get("output_type", ""), ()):
+            texto = _as_text(_dig(saida, caminho), sep)
             if texto:
-                segmentos.append(Segment(texto, cell_index, OUTPUT_ORIGIN))
+                segmentos.append(
+                    Segment(texto, cell_index, OUTPUT_ORIGIN, len(outputs) > 1 and ordem or 0)
+                )
     return segmentos
+
+
+def _extract_cells(documento: dict) -> list | None:
+    """Localiza as células, no topo (v4) ou dentro de `worksheets` (v3).
+
+    O schema do v3 exige `worksheets` no topo e guarda as células em
+    `worksheets[].cells[]`. Aceitar só `cells` fazia todo notebook v3 **real** cair na
+    degradação para texto — o segredo era achado, mas sem a localização por célula, que é o
+    valor deste milestone. A chave `input` sozinha não bastava: ela nunca era alcançada.
+    """
+    celulas = documento.get("cells")
+    if isinstance(celulas, list):
+        return celulas
+
+    folhas = documento.get("worksheets")
+    if isinstance(folhas, list):
+        reunidas: list = []
+        for folha in folhas:
+            if isinstance(folha, dict) and isinstance(folha.get("cells"), list):
+                reunidas.extend(folha["cells"])
+        return reunidas
+
+    return None
 
 
 def parse_notebook(raw: str) -> list[Segment] | None:
@@ -129,14 +161,18 @@ def parse_notebook(raw: str) -> list[Segment] | None:
     """
     try:
         documento = json.loads(raw)
-    except (json.JSONDecodeError, UnicodeDecodeError):
+    except (ValueError, RecursionError):
+        # `ValueError` cobre `JSONDecodeError`. `RecursionError` é o que `json.loads`
+        # levanta em JSON profundamente aninhado, e sem ele um único `.ipynb` estranho
+        # derrubava a varredura dos DEMAIS arquivos do diretório — o oposto do contrato
+        # que `_read_text` documenta e que `rules/error-handling.md § 2` exige.
         return None
 
     if not isinstance(documento, dict):
         return None
 
-    celulas = documento.get("cells")
-    if not isinstance(celulas, list):
+    celulas = _extract_cells(documento)
+    if celulas is None:
         return None
 
     segmentos: list[Segment] = []
@@ -145,10 +181,11 @@ def parse_notebook(raw: str) -> list[Segment] | None:
             continue
 
         for chave in _CODE_KEYS:
-            if chave in celula:
-                texto = _as_text(celula[chave])
-                if texto:
-                    segmentos.append(Segment(texto, indice, CODE_ORIGIN))
+            # A parada é por CONTEÚDO, não por presença: uma célula com `source: []` vazio
+            # e o código em `input` (v3) fazia o `break` disparar antes de olhar `input`.
+            texto = _as_text(celula.get(chave))
+            if texto:
+                segmentos.append(Segment(texto, indice, CODE_ORIGIN))
                 break
 
         segmentos.extend(_segments_from_outputs(celula.get("outputs"), indice))
