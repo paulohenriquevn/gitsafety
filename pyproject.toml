@@ -45,6 +45,13 @@ dev = [
     "ruff>=0.6,<1",
 ]
 
+[project.urls]
+# Sem isso, a página no PyPI não tem link para o código. Quem instala uma ferramenta de
+# segurança quer poder ler o que ela faz antes de rodá-la no próprio repositório.
+Repository = "https://github.com/paulohenriquevn/gitsafety"
+Changelog = "https://github.com/paulohenriquevn/gitsafety/blob/main/CHANGELOG.md"
+Issues = "https://github.com/paulohenriquevn/gitsafety/issues"
+
 [project.scripts]
 gitsafety = "gitsafety.__main__:main"
 

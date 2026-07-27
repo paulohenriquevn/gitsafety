@@ -19,6 +19,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
   configurava, conferia num arquivo qualquer e supunha que valia para todos (#M6)
 - O achado passa a mostrar o nome do arquivo como você o vê, em vez de
   `"b/configura\303\247\303\243o.env"` (#M6)
+- **`gitsafety --version` dizia a versão errada.** O pacote era 0.6.0 e o comando imprimia
+  0.4.0 — a versão estava escrita em dois lugares e divergiu. Agora vem do pacote instalado,
+  então não há o que sincronizar (#M6)
 
 ### Security
 
