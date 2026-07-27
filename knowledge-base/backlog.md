@@ -113,3 +113,32 @@ reescrever o histórico não desfaz a exposição — revogar a chave é a únic
 
 **Quando revisitar:** se o uso mostrar que gente conta com o comando para auditar a própria
 máquina. Aí o caminho é uma seção separada no relatório, não misturar com o histórico.
+
+## B5 — `--text` custa caro em binário, e não há teto por arquivo no hook
+
+**Origem:** review do M5, ao atacar as flags introduzidas para fechar o fail-open do
+`.gitattributes`.
+
+**Medido** (30 MB de binário aleatório no index, contra 200 arquivos de texto):
+
+| Conteúdo | Tempo | Pico de memória | Achados |
+|---|---|---|---|
+| 200 arquivos de texto | 0,22 s | — | 0 |
+| 30 MB de binário | **5,67 s** | **416 MB** | 0 |
+
+**Por que a flag existe mesmo assim:** sem `--text`, um `.gitattributes` com `-diff`, um
+byte NUL ou um driver `textconv` faziam o hook **deixar passar** o commit da credencial.
+Reverter reabre o fail-open. O custo é o preço da defesa.
+
+**Direção da falha:** segura. Se o hook estourar a memória e for morto, o git vê exit
+não-zero e **bloqueia** o commit. Degrada fechado.
+
+**Por que o teto por arquivo não entrou no M5:** o `scan` pula arquivo acima de 1 MB e
+**reporta o pulo** (`ScanResult.skipped`, contrato do M0). Copiar esse teto para o hook
+parece óbvio e não é: um arquivo de **texto** de 2 MB com uma credencial deixaria de
+bloquear o commit. Isso é perda de cobertura no único caminho que não pode perder. Um teto
+que sirva aqui precisa distinguir volume de risco — provavelmente por conteúdo binário, não
+por tamanho — e essa é uma decisão com medição própria, não uma cópia.
+
+**Quando revisitar:** M6 ou antes, se o dogfooding mostrar alguém desinstalando o hook por
+causa do primeiro commit num projeto com assets.

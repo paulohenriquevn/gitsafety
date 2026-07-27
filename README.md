@@ -54,8 +54,15 @@ Emergência: `git commit --no-verify` passa por cima do hook.
 ## Por que ele não enche o saco
 
 O hook verifica **apenas as linhas que você está introduzindo** — não o repositório
-inteiro, e nem mesmo o arquivo inteiro. Medido: o commit fica **~0,04 s** mais lento,
-independente de tocar 1 ou 200 arquivos.
+inteiro, e nem mesmo o arquivo inteiro. Para conteúdo de texto, medido: o commit fica
+**~0,04 s** mais lento, independente de tocar 1 ou 200 arquivos
+([benchmark](benchmarks/bench_hook.py)).
+
+Commitar **binário** é outra história: o hook lê o conteúdo para não deixar um segredo
+passar disfarçado de arquivo binário, e isso custa. Medido: 30 MB de binário no mesmo
+commit levam ~5,7 s. Não é o caso comum — mas se o seu primeiro commit com a ferramenta
+inclui uma pasta de assets, é bom saber. Ponha o caminho em `ignore:` se ele nunca vai
+conter credencial.
 
 Isso tem uma consequência que vale saber: se um arquivo **já tinha** um segredo commitado
 antes e você edita outra linha dele, o hook não reclama. É deliberado — do contrário,

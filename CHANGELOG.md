@@ -31,6 +31,12 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Changed
 
+- A promessa de velocidade do hook no README passou a qualificar o caso de **binário**:
+  ~0,04 s vale para conteúdo de texto; 30 MB de binário no mesmo commit levam ~5,7 s. É o
+  preço de ler o conteúdo em vez de confiar no que o git chama de binário (#M5)
+
+### Changed
+
 ### Deprecated
 
 ### Removed
