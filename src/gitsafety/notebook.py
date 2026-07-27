@@ -52,6 +52,7 @@ def _is_skipped_mime(chave: object) -> bool:
         and _TEXTUAL_MIME_MARKER not in chave
     )
 
+
 CODE_ORIGIN = "código"
 OUTPUT_ORIGIN = "saída"
 METADATA_ORIGIN = "metadados"
@@ -257,3 +258,36 @@ def parse_notebook(raw: str) -> list[Segment] | None:
         _collect(valor, 0, rotulo, 0, segmentos, chave)
 
     return segmentos
+
+
+def unescape(secret: str) -> str:
+    """O valor como existe no documento, não como o JSON o grafou.
+
+    O arquivo bruto grafa `ã` como `\\u00e3` e uma barra invertida como `\\\\`. Comparar as
+    duas visões sem desfazer isso trata a mesma ocorrência como duas coisas diferentes.
+    """
+    try:
+        return json.loads(f'"{secret}"')
+    except ValueError:
+        # Aspas ou barra soltas: não é literal JSON válido, então não houve escape a desfazer.
+        return secret
+
+
+def occurrences_per_line(secret: str, lines: list[str]) -> dict[int, int]:
+    """Quantas vezes este segredo aparece em cada linha do arquivo BRUTO — 1-based.
+
+    Contagem, e não apenas presença, porque é ela que permite dizer *qual* ocorrência é
+    qual. Saber só "este valor aparece nas linhas 8 e 22" não distingue a ocorrência da
+    célula 1 da ocorrência do SVG — e foi confundir as duas que fez um `allow` na primeira
+    apagar a segunda.
+
+    As duas grafias são contadas: o arquivo bruto pode escrever `ã` como `\\u00e3` e uma
+    barra invertida como `\\\\`, e a mesma ocorrência tem grafia diferente nas duas visões.
+    """
+    grafias = {secret, json.dumps(secret)[1:-1]}
+    contagem: dict[int, int] = {}
+    for numero, linha in enumerate(lines, start=1):
+        total = max(linha.count(grafia) for grafia in grafias)
+        if total:
+            contagem[numero] = total
+    return contagem

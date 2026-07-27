@@ -45,6 +45,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 - Um `# gitsafety: allow` em uma célula não silencia mais, por engano, um segredo
   **diferente** em outro ponto do mesmo notebook (#M4)
 - Segredo contendo barra invertida não é mais reportado duas vezes (#M4)
+- Um segredo em campo de forma inesperada, em imagem embutida, ou em duas saídas
+  consecutivas sem quebra de linha entre elas volta a ser reportado — antes o notebook
+  podia esconder o que a varredura de um arquivo comum encontraria (#M4)
 
 ### Deprecated
 

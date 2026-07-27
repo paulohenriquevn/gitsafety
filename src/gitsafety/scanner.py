@@ -14,7 +14,12 @@ from re import Pattern
 from typing import TYPE_CHECKING
 
 from gitsafety.finding import Finding
-from gitsafety.notebook import is_notebook, parse_notebook
+from gitsafety.notebook import (
+    is_notebook,
+    occurrences_per_line,
+    parse_notebook,
+    unescape,
+)
 from gitsafety.rules import BUILTIN_RULES, Rule
 from gitsafety.walker import SkippedFile, walk
 
@@ -108,39 +113,161 @@ def _scan_notebook(
     path: Path,
     rules: Sequence[Rule],
     allow: Sequence[Pattern[str]] = (),
-) -> list[Finding] | None:
-    """Varre um notebook parseado. Devolve `None` para sinalizar degradação (ADR D4).
+) -> list[tuple[Finding, bool]] | None:
+    """Varre o notebook parseado. Devolve `(finding, suprimido)`; `None` degrada (ADR D4).
 
     A localização — célula e linha **dentro** da célula — é codificada no `path` do
     `Finding`. Codificar ali, em vez de acrescentar campo à dataclass, é o que mantém o
     milestone aditivo: `cli.render` só imprime `f.path` e não precisa saber de notebooks,
     e os quatro milestones que consomem `Finding` seguem intocados.
 
-    A supressão é decidida **aqui e só aqui**. Enquanto existiam dois caminhos varrendo o
-    mesmo arquivo, ela era decidida duas vezes de forma independente, e uma supressão de um
-    lado apagava uma ocorrência não relacionada do outro — silêncio total num segredo real.
-    Uma decisão por ocorrência é o que impede isso, e ela só é possível com um caminho só.
+    Os suprimidos vêm junto, marcados, em vez de descartados. Um `# gitsafety: allow` que o
+    Jupyter separou do segredo ao quebrar a linha só é visível **aqui** — no arquivo bruto o
+    marcador está numa linha e o segredo noutra. Mas a supressão não pode ser aplicada aqui:
+    apagar por valor foi o que fez um `allow` numa célula silenciar uma ocorrência não
+    relacionada em outra. Ela é aplicada em `_localise`, sobre a ocorrência já pareada.
     """
     segmentos = parse_notebook(raw)
     if segmentos is None:
         return None
 
-    findings: list[Finding] = []
+    achados: list[tuple[Finding, bool]] = []
     for segmento in segmentos:
         for numero, linha in enumerate(segmento.text.splitlines(), start=1):
             for rule in rules:
                 for match in rule.pattern.finditer(linha):
-                    if is_allowed(match.group(0), linha, allow):
-                        continue
-                    findings.append(
-                        Finding(
-                            rule_id=rule.id,
-                            path=Path(segmento.locate(path)),
-                            line=numero,
-                            secret=match.group(0),
+                    achados.append(
+                        (
+                            Finding(
+                                rule_id=rule.id,
+                                path=Path(segmento.locate(path)),
+                                line=numero,
+                                secret=match.group(0),
+                            ),
+                            is_allowed(match.group(0), linha, allow),
                         )
                     )
-    return findings
+    return achados
+
+
+def _localise(
+    do_texto: list[Finding],
+    do_notebook: list[tuple[Finding, bool]] | None,
+    raw: str,
+) -> list[Finding]:
+    """Usa o documento parseado para MELHORAR a localização do que o texto já encontrou.
+
+    A varredura do arquivo bruto é a linha de base e **sempre roda**. Isso é o que torna a
+    cobertura um mecanismo em vez de uma afirmação: qualquer coisa que o percurso do JSON
+    não alcance — um mime que ele pule, um campo de forma inesperada, uma chave duplicada
+    que o `json` descarta — continua sendo reportada, com a linha do JSON em vez da célula.
+    Localização pior, nunca silêncio.
+
+    Essa distinção custou três rodadas de revisão para ficar clara. Duas vezes o parser foi
+    promovido a fonte da cobertura — primeiro com uma tabela de campos, depois com um
+    percurso "completo" — e as duas vezes ele deixou passar formas válidas que ninguém tinha
+    listado. A completude do percurso é uma crença; a da varredura de texto é o comportamento
+    que os quatro milestones anteriores já entregavam.
+
+    O pareamento é pela **linha bruta**, não pelo valor nem pela ordem. Parear por valor
+    esconde uma ocorrência quando o mesmo segredo está em dois lugares; parear por ordem
+    quebra quando um dos lados suprimiu algo que o outro não viu. A linha é a identidade
+    real da ocorrência, e `raw_lines_containing` a recupera.
+
+    Um achado do parser que não existe em nenhuma linha isolada é um valor que o Jupyter
+    partiu entre elementos — invisível ao texto por construção. Esse entra como achado
+    **adicional**, e é o caso que originou o milestone.
+    """
+    if do_notebook is None:
+        return do_texto
+
+    linhas = raw.splitlines()
+    localizados = _assign_raw_lines(do_notebook, linhas)
+
+    resultado: list[Finding] = []
+    usados: set[int] = set()
+    for bruto in do_texto:
+        par = next(
+            (
+                indice
+                for indice, (finding, _, linha) in enumerate(localizados)
+                if indice not in usados
+                and linha == bruto.line
+                and finding.rule_id == bruto.rule_id
+                and finding.secret == unescape(bruto.secret)
+            ),
+            None,
+        )
+        if par is None:
+            # O texto achou algo que o percurso não alcançou. Vale com a localização bruta.
+            resultado.append(bruto)
+            continue
+        usados.add(par)
+        finding, suprimido, _ = localizados[par]
+        if not suprimido:
+            resultado.append(finding)
+
+    # Todo achado do parser que sobrou e não foi suprimido entra por conta própria. São
+    # duas situações, e ambas são achados reais que o texto não produziu:
+    #
+    # - Valor que o Jupyter partiu entre elementos — invisível ao texto por construção. É o
+    #   caso que originou o milestone.
+    # - Ocorrência que o texto suprimiu **demais**: o marcador vale por linha, e um notebook
+    #   gravado sem indentação põe o arquivo inteiro numa linha só, onde um único
+    #   `# gitsafety: allow` calaria todos os segredos do documento. O parser vê a linha da
+    #   célula, que é a que o usuário escreveu, e é a leitura correta.
+    resultado.extend(
+        finding
+        for indice, (finding, suprimido, _) in enumerate(localizados)
+        if indice not in usados and not suprimido
+    )
+    return resultado
+
+
+def _assign_raw_lines(
+    do_notebook: list[tuple[Finding, bool]],
+    linhas: list[str],
+) -> list[tuple[Finding, bool, int | None]]:
+    """Diz, para cada achado do parser, em que linha bruta ESTA ocorrência está.
+
+    Saber apenas que o valor aparece nas linhas 8 e 22 não basta: com o mesmo segredo em
+    dois lugares, o achado da célula 1 casaria com a linha do segundo, e uma supressão no
+    primeiro apagaria o segundo. A atribuição precisa ser 1-para-1.
+
+    O percurso do documento e o arquivo bruto estão na **mesma ordem** — `json.loads`
+    preserva a ordem das chaves, e listas são ordenadas. Então basta avançar um ponteiro por
+    segredo: cada ocorrência toma a primeira linha ainda disponível a partir da anterior. A
+    capacidade por linha é a contagem de ocorrências ali, para que duas na mesma linha não
+    briguem pela mesma vaga.
+
+    `None` significa que a ocorrência não existe em nenhuma linha isolada — valor partido
+    entre elementos pelo Jupyter.
+    """
+    capacidades: dict[str, dict[int, int]] = {}
+    ponteiros: dict[str, int] = {}
+
+    atribuidos: list[tuple[Finding, bool, int | None]] = []
+    for finding, suprimido in do_notebook:
+        segredo = finding.secret
+        if segredo not in capacidades:
+            capacidades[segredo] = occurrences_per_line(segredo, linhas)
+            ponteiros[segredo] = 0
+
+        capacidade = capacidades[segredo]
+        escolhida = next(
+            (
+                numero
+                for numero in sorted(capacidade)
+                if numero >= ponteiros[segredo] and capacidade[numero] > 0
+            ),
+            None,
+        )
+        if escolhida is not None:
+            capacidade[escolhida] -= 1
+            ponteiros[segredo] = escolhida
+        atribuidos.append((finding, suprimido, escolhida))
+
+    return atribuidos
 
 
 def scan_path(
@@ -164,13 +291,12 @@ def scan_path(
     findings: list[Finding] = []
     for path in files:
         bruto = _read_text(path)
+        do_texto = _scan_text(bruto, path, regras, cfg.allow)
         if is_notebook(path):
-            do_notebook = _scan_notebook(bruto, path, regras, cfg.allow)
-            if do_notebook is not None:
-                findings.extend(do_notebook)
-                continue
-            # `None` = JSON não parseou. Cai para texto, que é o comportamento dos
-            # milestones anteriores — degradação para estado conhecido (ADR D4).
-        findings.extend(_scan_text(bruto, path, regras, cfg.allow))
+            findings.extend(
+                _localise(do_texto, _scan_notebook(bruto, path, regras, cfg.allow), bruto)
+            )
+        else:
+            findings.extend(do_texto)
 
     return ScanResult(findings=findings, skipped=skipped)

@@ -32,7 +32,7 @@ Nenhuma regex de linha atravessa isso; juntar antes de varrer, sim.
 |---|---|---|
 | Segredos achados (notebook de 5) | 4 | **5** |
 | Localização | linha do JSON | célula + linha dentro dela |
-| Testes | 542 | **612** |
+| Testes | 542 | **913** |
 
 Exemplo real, do repositório de validação de integração:
 
@@ -62,13 +62,15 @@ rodadas. `benchmarks/bench_notebook.py`.
 
 | células | bytes | parseado | texto | razão |
 |---|---|---|---|---|
-| 20 | 25.663 | 0,0094 s | 0,0208 s | 0,45× |
-| 50 | 64.063 | 0,0211 s | 0,0501 s | 0,42× |
-| 100 | 128.064 | 0,0462 s | 0,1021 s | 0,45× |
-| 200 | 256.164 | 0,0934 s | 0,2166 s | **0,43×** |
+| 20 | 25.663 | 0,0363 s | 0,0240 s | 1,51× |
+| 50 | 64.063 | 0,0828 s | 0,0525 s | 1,58× |
+| 100 | 128.064 | 0,1669 s | 0,1163 s | 1,43× |
+| 200 | 256.164 | 0,3063 s | 0,2254 s | **1,36×** |
 
-**O teto da Unresolved Question Q3 era 5×; o parsing é 2,3× mais rápido que o texto.** Ele
-varre menos bytes: sem a sintaxe do JSON, sem os escapes, e sem o base64 das imagens.
+**O teto da Unresolved Question Q3 era 5×; o custo real é 1,36×.** É o preço de varrer as
+duas visões — o arquivo bruto para a cobertura, o documento parseado para a localização. A
+medição chegou a marcar 0,43× quando só o parser rodava, e esse número media um produto que
+perdia achados em quase metade dos notebooks gerados.
 
 **Duas correções de método, ambas no sentido de piorar o número que eu publicaria.** A
 primeira medição deu 0,36× porque eu gerava o notebook com `json.dumps` sem indentação —
@@ -181,7 +183,7 @@ silencioso.
 
 | Gate | Verdicto |
 |---|---|
-| Suíte | 612 passando |
+| Suíte | 913 passando (301 deles gerados por fuzz diferencial) |
 | `ruff check` / `format` | limpo |
 | `/code-quality` | `FAIL_SOFT` — 0 HARD; os 6 achados são de `.claude/skills/`, cobertos pelo ADR 0001; `vulture src/ benchmarks/` não acha nada no produto |
 | `--staged` não regride (D5) | `git diff --name-only` não contém `staged.py` nem `cli.py`; os 7 testes e2e do M1 seguem verdes |
