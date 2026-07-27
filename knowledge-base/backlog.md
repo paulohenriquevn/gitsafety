@@ -52,36 +52,46 @@ e evidência. O `gh` desta máquina está autenticado como outro usuário e não
 no repositório (`must be a collaborator`), então o registro fica aqui. Vale promover a
 issue quando a autenticação estiver correta.
 
-## B3 — `scan --history` custa ~6 s em repositório pequeno; o eixo é linhas, não commits
+## B3 — RESOLVIDO POR DECISÃO: o custo do `--history` fica como está
 
-**Origem:** validação de integração do M5 (2026-07-27), rodando no próprio repositório.
+**Origem:** validação de integração do M5; investigado a fundo ao fechar a issue #4.
 
-**Medido:**
+**O custo, medido:** ~6 s no repositório do gitsafety (51 commits, 74 mil linhas
+adicionadas). O eixo é `linhas × regras`, não commits. O perfil mostra 4 milhões de
+chamadas a `finditer` e ~4,6 s de overhead do laço em Python.
 
-| Alvo | Commits | Linhas adicionadas | git | Varredura | Total |
-|---|---|---|---|---|---|
-| gitsafety (real) | 51 | 74.216 | 0,23 s | ~6 s | ~6 s |
-| Sintético | 5.000 | ~10.000 | 0,20 s | 0,16 s | 0,37 s |
-| Sintético | 1.000 | 50.000 | 0,10 s | 0,64 s | 0,74 s |
+**Três otimizações medidas — duas piores, uma rejeitada:**
 
-**A causa é o desenho, não um defeito:** o custo é `linhas × 53 regras`, e o perfil confirma
-— 3,9 milhões de chamadas a `finditer`, com 4,6 s de overhead do laço em Python. Não há
-linha patológica: a maior tem 884 caracteres e a mediana é 42.
+| Hipótese | Resultado |
+|---|---|
+| Pré-filtro de marcadores literais | **2× mais lento**, e perdia 1 casamento |
+| Regex única combinada com grupos nomeados | **3,5× mais lento**, e perdia 11 casamentos |
+| Pular linhas mais curtas que o menor casamento possível | **1,40× mais rápido**, achados idênticos |
 
-**Por que o número sintético é otimista:** o gerador produz linhas curtas e uniformes
-(~10 caracteres). Uma regex custa proporcionalmente ao comprimento, então o piso sintético
-subestima o real em cerca de uma ordem de grandeza. O caveat está escrito no próprio
-benchmark.
+O pré-filtro falha porque 23 das 54 regras não têm literal obrigatório e rodam de qualquer
+forma, e porque o `re` do Python **já** otimiza prefixo literal internamente — o filtro
+explícito duplica trabalho que a biblioteca faz melhor. Isso explica o "ganho zero" da
+tentativa anterior, que eu tinha registrado sem entender.
 
-**Por que não foi otimizado no M5:** o `ROADMAP.md § M5` decide antecipadamente que o Risco
-nº 1 se resolve **documentando o custo**, não adicionando flags de tuning. E o M2 já mediu
-e decidiu contra um pré-filtro de literais. Reverter essa decisão exige medição própria —
-uma tentativa rápida durante o M5 produziu um filtro que deixava passar 100% das linhas, ou
-seja, ganho zero. Fazer direito é escopo de outro milestone.
+A regex combinada falha porque a alternância para no primeiro casamento de cada posição:
+dois segredos sobrepostos de regras diferentes viram um.
 
-**Quando revisitar:** se o dogfooding mostrar que alguém deixa de rodar o comando por causa
-do tempo. O caminho provável é um pré-filtro de marcadores literais (`AKIA`, `ghp_`,
-`postgresql://`) construído a partir do catálogo, medido contra o corpus real.
+**Por que a terceira, que funciona, foi rejeitada.**
+
+O ganho é 1,40× — de ~6 s para ~4,3 s. Isso não muda a decisão de ninguém sobre rodar ou
+não o comando. E o mecanismo tem uma condição de correção que eu não sei **provar**: o piso
+teria de ser o menor casamento que qualquer regra pode produzir, e isso não é derivável do
+`re` sem escrever um analisador de regex. Um piso derivado dos exemplos do catálogo é
+empírico — uma regra futura que case algo mais curto que os próprios exemplos vira **falso
+negativo silencioso**.
+
+Trocar 1,7 segundo por um mecanismo cuja falha é silenciosa é exatamente o negócio que o M4
+mostrou ser ruim: cinco rodadas de review para eliminar defeitos dessa classe. E o
+`ROADMAP.md § M5` já tinha decidido: documentar o custo, não adicionar tuning.
+
+**Se alguém revisitar:** o caminho é derivar o piso **soundly** da estrutura da regex (soma
+dos mínimos de literais e quantificadores), com um teste que fuzza cada regra procurando
+casamento abaixo do piso. Aí o mecanismo deixa de ser empírico. Antes disso, não vale.
 
 ## B4 — `scan --history` não alcança commit reescrito (reflog)
 
