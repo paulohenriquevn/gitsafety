@@ -6,6 +6,20 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.3.0] - 2026-07-27
+
+### Added
+
 - **Catálogo com 53 padrões de credencial** cobrindo as 6 categorias documentadas: cloud
   (AWS, GCP, Azure, DigitalOcean, Heroku, Cloudflare), controle de versão e pacotes
   (GitHub, GitLab, npm, PyPI, RubyGems, crates.io), IA (OpenAI, Anthropic, Hugging Face,
@@ -18,16 +32,6 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
   tempo por regra contra entradas adversariais: nenhuma regex pode pendurar o commit.
 - Corpus limpo de referência para medir falso positivo de forma reprodutível.
   Resultado: **zero findings**.
-
-### Changed
-
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
 
 ## [0.2.0] - 2026-07-27
 
