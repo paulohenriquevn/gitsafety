@@ -18,6 +18,15 @@ o público de cientistas de dados. O `ROADMAP.md § M4` nomeia dois riscos: vari
 O que a descoberta acrescentou ao enunciado: **a varredura atual já acha a maior parte**, e
 o valor do M4 é mais estreito e mais preciso do que "passar a suportar notebooks".
 
+## Objective
+
+Travar quatro decisões antes do `/to-plan` do M4: se parsear ou continuar tratando como
+texto, como localizar o achado de forma que o usuário consiga agir, quais caminhos de
+saída percorrer, e o que fazer com notebook malformado.
+
+A medição da Q4 responde à primeira e reformula as demais: a lacuna real é de
+**localização**, não de cobertura.
+
 ## Coverage Corner 1 — Integration Tests
 
 ### Q4 — O que a varredura atual perde, medido
