@@ -19,9 +19,10 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 - **`scan --history` avisa quando há commit reescrito.** Se você usou `git reset` ou
   `rebase` para "remover" uma chave, o comando não alcança esses commits — e agora diz
   isso, em vez de deixar você acreditar que o repositório está limpo (#7)
-- **O hook e o `--history` agora apontam a célula do notebook**, igual ao `gitsafety scan`. Antes ele dizia
-  `analise.ipynb:14` — a linha do JSON, que não existe quando você abre o arquivo no
-  Jupyter — enquanto o `scan` já dizia `célula 2 (código)` (#6)
+- **O hook e o `--history` agora apontam a célula do notebook**, igual ao `gitsafety scan`.
+  Antes diziam `analise.ipynb:14` — a linha do JSON, que não existe quando você abre o
+  arquivo no Jupyter. Uma diferença permanece, e vale saber: um segredo que o Jupyter
+  partiu no meio ao salvar é encontrado pelo `gitsafety scan`, e não pelos outros dois (#6)
 - Quando um arquivo é pulado, a saída agora diz **qual** — antes dizia só quantos, o que
   não permitia decidir se valia inspecionar
 
@@ -36,6 +37,12 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
   configurava, conferia num arquivo qualquer e supunha que valia para todos (#M6)
 - O achado passa a mostrar o nome do arquivo como você o vê, em vez de
   `"b/configura\303\247\303\243o.env"` (#M6)
+- **`scan --history` mostrava a contagem de reintroduções no segredo errado** quando havia
+  mais de um segredo no mesmo notebook e commit. É o número que diz "esta credencial voltou
+  depois de ter saído", e ele apontava a credencial errada (#6)
+- **`# gitsafety: allow` passa a valer no `--history`** quando o Jupyter separou o marcador
+  do segredo ao salvar — antes o `scan` e o hook respeitavam e o histórico não, e ainda
+  reportava o segredo duas vezes (#6)
 - **`gitsafety --version` dizia a versão errada.** O pacote era 0.6.0 e o comando imprimia
   0.4.0 — a versão estava escrita em dois lugares e divergiu. Agora vem do pacote instalado,
   então não há o que sincronizar (#M6)
