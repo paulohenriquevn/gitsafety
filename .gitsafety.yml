@@ -1,0 +1,16 @@
+# Configuração do próprio gitsafety — dogfooding do que o README recomenda.
+#
+# Um projeto que detecta segredos é o caso extremo de falso positivo: o catálogo e os
+# testes contêm valores de exemplo por natureza. Os caminhos abaixo são as DEFINIÇÕES
+# desses exemplos, não código que possa vazar credencial de verdade.
+
+ignore:
+  # O catálogo declara `true_positives` para cada regra — são os exemplos que o CI usa
+  # para provar que a regra funciona. Sem eles a suíte não teria como falhar.
+  - "src/gitsafety/catalog.py"
+  # Fixtures e casos de teste, incluindo os 900 documentos que o fuzz gera.
+  - "tests/**"
+  # Blueprints e planos citam os valores medidos durante a descoberta.
+  - "knowledge-base/**"
+  # Os peers clonados, que são código de terceiros com seus próprios exemplos.
+  - "knowledge-base/references/**"
