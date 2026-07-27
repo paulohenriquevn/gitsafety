@@ -191,7 +191,7 @@ vazamento.
 
 ---
 
-### M4 — [ ] Notebooks Jupyter
+### M4 — [x] Notebooks Jupyter
 
 **Objetivo:** cobrir o vetor de vazamento específico do cientista de dados.
 

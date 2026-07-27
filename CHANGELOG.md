@@ -6,6 +6,20 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.5.0] - 2026-07-27
+
+### Added
+
 - **Notebooks Jupyter (`.ipynb`) passam a ser lidos como notebook, não como texto.** O
   achado aponta a **célula** e a linha dentro dela — `analise.ipynb :: célula 4 (saída):1`
   — em vez da linha do JSON, que não existe quando você abre o arquivo no Jupyter (#M4)
@@ -53,12 +67,6 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
   `# gitsafety: allow` deixar de valer (#M4)
 - Os achados de um notebook saem na ordem do arquivo, também quando ele foi salvo sem
   indentação (#M4)
-
-### Deprecated
-
-### Removed
-
-### Security
 
 ## [0.4.0] - 2026-07-27
 
