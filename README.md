@@ -73,14 +73,17 @@ desligar a ferramenta na segunda semana.
 
 Sem configurar nada:
 
-| Categoria | Exemplos |
-|---|---|
-| Cloud | AWS, Google Cloud, Azure |
-| Git / pacotes | GitHub (`ghp_`, `github_pat_`), GitLab, npm, PyPI |
-| IA e dados | OpenAI (`sk-`), Anthropic (`sk-ant-`), Hugging Face |
-| Pagamentos e SaaS | Stripe, Twilio, SendGrid, Slack |
-| Chaves privadas | Blocos PEM (`BEGIN ... PRIVATE KEY`) |
-| Banco de dados | Strings de conexão com senha (`postgres://user:senha@host`) |
+| Categoria | Regras | Exemplos |
+|---|---|---|
+| Cloud | 8 | AWS, Google Cloud, Azure, DigitalOcean, Heroku, Cloudflare |
+| Git / pacotes | 11 | GitHub (`ghp_`, `github_pat_`, `gho_`, `ghs_`, `ghr_`), GitLab, npm, PyPI, RubyGems, crates.io |
+| IA e dados | 6 | OpenAI (`sk-`), Anthropic (`sk-ant-`), Hugging Face, Cohere, Replicate, W&B |
+| Pagamentos e SaaS | 19 | Stripe, Twilio, SendGrid, Slack, Sentry, Shopify, Atlassian, Linear, JWT |
+| Chaves privadas | 4 | Blocos PEM, PuTTY, PKCS#8 cifrada, age |
+| Banco de dados | 5 | Strings de conexão com senha: PostgreSQL, MySQL, MongoDB, Redis, AMQP |
+
+**53 padrões no total.** Cada um traz seus próprios exemplos de acerto e de não-acerto,
+verificados a cada execução da suíte.
 
 O que for específico do seu time entra no YAML — veja abaixo.
 

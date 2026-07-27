@@ -20,7 +20,34 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from typing import Pattern
+from dataclasses import dataclass
+from re import Pattern
+
+
+@dataclass(frozen=True)
+class Rule:
+    """Padrão de detecção nomeado, com seus próprios casos de teste.
+
+    Mora aqui, junto dos construtores que a produzem, e não em `rules.py`: aquele módulo
+    acumulava o **tipo** e o **registro**, duas responsabilidades cujo acoplamento
+    produzia import circular assim que o catálogo passou a ser um módulo à parte. O
+    grafo agora é acíclico — `patterns` → `catalog` → `rules`.
+
+    Congelada porque regra é dado imutável compartilhado por toda a varredura: mutação
+    acidental num arquivo mudaria o comportamento nos demais.
+
+    `true_positives` e `false_positives` têm default vazio para não quebrar construção
+    existente, **mas** `tests/unit/test_catalog.py` exige que sejam não-vazios para toda
+    regra do catálogo. Sem essa exigência, o default seria a porta pela qual uma regra
+    entraria sem exemplo nenhum.
+    """
+
+    id: str
+    description: str
+    pattern: Pattern[str]
+    true_positives: tuple[str, ...] = ()
+    false_positives: tuple[str, ...] = ()
+
 
 #: Delimitador que pode preceder um segredo: aspas, crase, espaço, `=`.
 #: Verificado por **lookbehind**, que não consome — ver `_SUFFIX`.
@@ -117,6 +144,28 @@ def unique_token(secret_regex: str, *, case_insensitive: bool = False) -> Patter
 
     flags = "(?i)" if case_insensitive else ""
     return re.compile(f"{flags}{_PREFIX}({secret_regex}){_SUFFIX}")
+
+
+def literal_marker(secret_regex: str) -> Pattern[str]:
+    """Padrão cujo **próprio literal** é a âncora — sem delimitador de palavra.
+
+    Existe para casos como `-----BEGIN RSA PRIVATE KEY-----` e
+    `PuTTY-User-Key-File-3:`, cujo texto é inconfundível e cujo primeiro caractere não é
+    word. `unique_token` recusa esses padrões de propósito, porque para ele o
+    delimitador à esquerda nunca casaria.
+
+    Enfraquecer a guarda do `unique_token` para acomodá-los seria pior: ela protege
+    contra a regra que nunca casa, que é falso negativo permanente e invisível. Um
+    construtor estreito e nomeado deixa explícito **quais** padrões dispensam a
+    delimitação, em vez de abrir uma exceção que qualquer regra futura poderia usar sem
+    perceber.
+
+    A disciplina do ADR D2 continua valendo: o teste do catálogo verifica quantificador
+    livre em todos os padrões, venham do construtor que vierem.
+    """
+    if not secret_regex:
+        raise ValueError("secret_regex vazio")
+    return re.compile(f"({secret_regex})")
 
 
 def keyword_assignment(keywords: Sequence[str], secret_regex: str) -> Pattern[str]:

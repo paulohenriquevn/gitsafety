@@ -69,3 +69,7 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 # Testes podem usar `assert` livremente e importar fixtures de forma não convencional.
 "tests/**" = ["S101"]
+# O corpus limpo embute o CONTEÚDO de arquivos dentro de literais de string. Ali o
+# comprimento da linha é dado — quebrá-lo mudaria o corpus que a métrica de falso
+# positivo mede, e a métrica deixaria de ser comparável entre execuções.
+"tests/fixtures/clean_corpus.py" = ["S101", "E501"]

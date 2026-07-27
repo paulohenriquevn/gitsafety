@@ -6,6 +6,19 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Added
 
+- **Catálogo com 53 padrões de credencial** cobrindo as 6 categorias documentadas: cloud
+  (AWS, GCP, Azure, DigitalOcean, Heroku, Cloudflare), controle de versão e pacotes
+  (GitHub, GitLab, npm, PyPI, RubyGems, crates.io), IA (OpenAI, Anthropic, Hugging Face,
+  Cohere, Replicate, W&B), pagamentos e SaaS (Stripe, Twilio, SendGrid, Slack, Sentry,
+  Shopify, Atlassian, JWT), chaves privadas (PEM, PuTTY, PKCS#8, age) e bancos de dados
+  (PostgreSQL, MySQL, MongoDB, Redis, AMQP).
+- Cada padrão carrega seus próprios exemplos de acerto **e de não-acerto**, verificados
+  a cada execução da suíte — uma regra que falha seus próprios exemplos não passa no CI.
+- Verificação mecânica de que nenhum padrão tem quantificador sem teto, e medição de
+  tempo por regra contra entradas adversariais: nenhuma regex pode pendurar o commit.
+- Corpus limpo de referência para medir falso positivo de forma reprodutível.
+  Resultado: **zero findings**.
+
 ### Changed
 
 ### Deprecated
