@@ -6,6 +6,20 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.7.0] - 2026-07-27
+
+### Added
+
 - **Credencial atribuída a variável de nome revelador passa a ser detectada** —
   `aws_secret_access_key = "..."`, `password = "..."`, `api_key = "..."` e semelhantes.
   Antes só detectávamos valores com prefixo próprio, o que significa que a chave de acesso
@@ -26,10 +40,6 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 - Quando um arquivo é pulado, a saída agora diz **qual** — antes dizia só quantos, o que
   não permitia decidir se valia inspecionar
 
-### Deprecated
-
-### Removed
-
 ### Fixed
 
 - **`ignore:` volta a funcionar para arquivo com acento, espaço ou aspas no nome.** O git
@@ -46,8 +56,6 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 - **`gitsafety --version` dizia a versão errada.** O pacote era 0.6.0 e o comando imprimia
   0.4.0 — a versão estava escrita em dois lugares e divergiu. Agora vem do pacote instalado,
   então não há o que sincronizar (#M6)
-
-### Security
 
 ## [0.6.0] - 2026-07-27
 
