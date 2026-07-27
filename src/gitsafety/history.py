@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from gitsafety.errors import GitsafetyError
 from gitsafety.finding import Finding
 from gitsafety.git import run_git
 from gitsafety.rules import BUILTIN_RULES, Rule
@@ -159,6 +160,35 @@ def parse_commits(raw: str) -> list[tuple[CommitInfo, str]]:
         commits.append((atual, "\n".join(corpo)))
 
     return commits
+
+
+def rewritten_commits(cwd: Path) -> int:
+    """Quantos commits existem só no reflog local, fora de qualquer referência.
+
+    Serve a um risco específico e grave: alguém reescreve o histórico para "remover" a
+    chave, roda `--history`, vê "nenhum segredo encontrado" e acredita que resolveu. O
+    commit saiu das referências, mas o objeto continua no repositório local por cerca de 90
+    dias — e reescrever histórico nunca desfez uma exposição. Falsa sensação de segurança é
+    o pior resultado que uma ferramenta de segurança pode produzir.
+
+    **Por que contar em vez de varrer.** O reflog é local e pessoal: ele registra o que
+    *você* fez nesta máquina, não o que está no repositório compartilhado. Um achado vindo
+    dali afirma "esta chave passou pelo seu disco", não "está no histórico do projeto" — e
+    misturar as duas afirmações num relatório só é pior que não ter a segunda. Além disso o
+    reflog **não existe num clone novo nem em CI**, então varrê-lo por padrão faria a mesma
+    revisão do mesmo repositório dar respostas diferentes em máquinas diferentes.
+
+    Contar custa 8 ms e permite avisar sobre a lacuna exatamente quando ela existe, sem
+    gastar uma flag (`docs/PRD.md § NFR-3` limita o `scan` a quatro) nem prometer o que não
+    entregamos.
+    """
+    try:
+        saida = run_git(["rev-list", "--reflog", "--not", "--all", "--count"], cwd=cwd)
+        return int(saida.strip() or 0)
+    except (GitsafetyError, ValueError):
+        # Repositório sem reflog, ou git que não entende a combinação: a ausência do aviso
+        # é aceitável; um erro aqui não pode derrubar a varredura, que é o que importa.
+        return 0
 
 
 def scan_history(

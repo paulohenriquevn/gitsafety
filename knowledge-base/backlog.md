@@ -99,7 +99,7 @@ mostrou ser ruim: cinco rodadas de review para eliminar defeitos dessa classe. E
 dos mínimos de literais e quantificadores), com um teste que fuzza cada regra procurando
 casamento abaixo do piso. Aí o mecanismo deixa de ser empírico. Antes disso, não vale.
 
-## B4 — `scan --history` não alcança commit reescrito (reflog)
+## B4 — RESOLVIDO POR AVISO: commit reescrito é sinalizado, não varrido
 
 **Origem:** medido na descoberta do M5 (Q5) e cobrado no review — o plano listou como
 Risco nº 4 com a mitigação "declarado no blueprint e no backlog", e o registro no backlog
@@ -127,8 +127,21 @@ relatório só é pior que não ter a segunda.
 **Mitigação entregue no M5:** o `README.md` § Histórico declara a lacuna e reforça que
 reescrever o histórico não desfaz a exposição — revogar a chave é a única ação que resolve.
 
-**Quando revisitar:** se o uso mostrar que gente conta com o comando para auditar a própria
-máquina. Aí o caminho é uma seção separada no relatório, não misturar com o histórico.
+**Fechado na issue #7**, por uma terceira via que a issue não considerava: em vez de varrer
+o reflog (que faria o resultado depender da máquina) ou apenas documentar (que deixa o
+usuário descobrir sozinho), o comando **conta** os commits fora das referências e avisa.
+
+```
+Nenhum segredo encontrado.
+
+Atenção: 1 commit reescrito não foi verificado.
+Reescrever o histórico não desfaz a exposição — revogue a chave.
+```
+
+Custa 8 ms (`git rev-list --reflog --not --all --count`), não gasta uma flag — o
+`docs/PRD.md § NFR-3` limita o `scan` a quatro — e ataca o risco real, que não é a lacuna em
+si: é alguém reescrever o histórico, ver "nenhum segredo encontrado" e acreditar que
+resolveu. Falsa sensação de segurança é o pior resultado que esta ferramenta pode produzir.
 
 ## B4b — RESOLVIDO: C-quoting de caminho (era MEDIUM do review do M5)
 

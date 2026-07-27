@@ -18,7 +18,7 @@ from pathlib import Path
 from gitsafety import __version__
 from gitsafety.config import load_config
 from gitsafety.errors import ExitCode, GitsafetyError
-from gitsafety.history import HistoryFinding, scan_history
+from gitsafety.history import HistoryFinding, rewritten_commits, scan_history
 from gitsafety.hook import install_hook
 from gitsafety.scanner import ScanResult, scan_path
 from gitsafety.staged import scan_staged
@@ -111,7 +111,12 @@ def render(result: ScanResult, *, show_secrets: bool) -> str:
     return "\n".join(linhas)
 
 
-def render_history(achados: Sequence[HistoryFinding], *, show_secrets: bool) -> str:
+def render_history(
+    achados: Sequence[HistoryFinding],
+    *,
+    show_secrets: bool,
+    reescritos: int = 0,
+) -> str:
     """Formata achados do histórico: onde o segredo entrou, e por quem.
 
     O commit é o da **introdução** — "desde quando esta chave está exposta?" é a pergunta
@@ -142,6 +147,20 @@ def render_history(achados: Sequence[HistoryFinding], *, show_secrets: bool) -> 
         linhas.append("  Remover o arquivo agora NÃO apaga o segredo do histórico.")
     else:
         linhas.append("  Nenhum segredo encontrado.")
+
+    if reescritos:
+        # O pior resultado possível deste comando é falsa sensação de segurança: alguém
+        # reescreve o histórico para "remover" a chave, vê "nenhum segredo encontrado" e
+        # acredita que resolveu. O commit saiu das referências; o objeto continua no
+        # repositório local por ~90 dias, e reescrever histórico nunca desfez exposição.
+        plural = "s" if reescritos > 1 else ""
+        verbo = "foram" if reescritos > 1 else "foi"
+        linhas.append("")
+        linhas.append(
+            f"  Atenção: {reescritos} commit{plural} reescrito{plural} "
+            f"não {verbo} verificado{plural}."
+        )
+        linhas.append("  Reescrever o histórico não desfaz a exposição — revogue a chave.")
 
     return "\n".join(linhas)
 
@@ -181,7 +200,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         cfg = load_config(Path(args.config) if args.config else None)
         if args.history:
             achados = scan_history(Path.cwd(), config=cfg)
-            print(render_history(achados, show_secrets=args.show_secrets))
+            print(
+                render_history(
+                    achados,
+                    show_secrets=args.show_secrets,
+                    reescritos=rewritten_commits(Path.cwd()),
+                )
+            )
             return ExitCode.SECRETS_FOUND if achados else ExitCode.SUCCESS
 
         result = (

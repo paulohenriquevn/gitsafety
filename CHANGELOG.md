@@ -16,6 +16,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Changed
 
+- **`scan --history` avisa quando há commit reescrito.** Se você usou `git reset` ou
+  `rebase` para "remover" uma chave, o comando não alcança esses commits — e agora diz
+  isso, em vez de deixar você acreditar que o repositório está limpo (#7)
 - **O hook agora aponta a célula do notebook**, igual ao `gitsafety scan`. Antes ele dizia
   `analise.ipynb:14` — a linha do JSON, que não existe quando você abre o arquivo no
   Jupyter — enquanto o `scan` já dizia `célula 2 (código)` (#6)

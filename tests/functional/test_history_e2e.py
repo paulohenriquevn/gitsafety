@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from gitsafety.history import scan_history
+from gitsafety.history import rewritten_commits, scan_history
 from gitsafety.scanner import scan_path
 
 AKIA = "AKIAIOSFODNN7EXAMPLE"
@@ -300,3 +300,33 @@ def test_latin1_file_does_not_abort_the_whole_scan(repo):
 
     achados = scan_history(repo.path)
     assert [h.finding.secret for h in achados] == [AKIA]
+
+
+# --- A lacuna do reflog, avisada em vez de silenciosa (issue #7) -----------------
+
+
+def test_history_warns_when_rewritten_commits_exist(repo):
+    """Quem reescreve o histórico para "remover" a chave precisa saber que não removeu.
+
+    O pior resultado possível deste comando é falsa sensação de segurança: alguém roda
+    `git reset`, vê "nenhum segredo encontrado" e acredita que resolveu. O commit saiu das
+    referências, mas o objeto continua no repositório local por ~90 dias.
+
+    O aviso custa 8 ms (`git rev-list --reflog --not --all --count`) e só aparece quando há
+    de fato commit fora das referências.
+    """
+    repo.commit("base.txt", "base\n", "base")
+    repo.commit("leak.env", f"AWS='{AKIA}'\n", "oops")
+    repo.git("reset", "-q", "--soft", "HEAD~1")
+    repo.git("restore", "--staged", "leak.env")
+    (repo.path / "leak.env").unlink()
+    repo.git("commit", "-q", "--allow-empty", "-m", "reescrito")
+
+    assert scan_history(repo.path) == []  # o histórico está limpo, de fato
+    assert rewritten_commits(repo.path) == 1
+
+
+def test_no_warning_when_history_was_not_rewritten(repo):
+    """Repositório comum não recebe aviso — senão vira ruído que ninguém lê."""
+    repo.commit("a.py", "x = 1\n")
+    assert rewritten_commits(repo.path) == 0
