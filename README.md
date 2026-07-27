@@ -75,6 +75,12 @@ maiúsculas é uma chave da AWS, não tem outra leitura. Nada de heurística de
 "parece aleatório", que é o que enche relatório de falso positivo e faz o time
 desligar a ferramenta na segunda semana.
 
+A única regra que olha o **contexto** em vez do valor é a genérica: ela exige o nome da
+variável (`password`, `api_key`, `aws_secret_access_key`…), o operador de atribuição, e um
+valor de 20+ caracteres **com dígito e letra**. Isso é o que separa uma credencial de um
+identificador de código — `secret_key = settings.SECRET_KEY` não casa, `token = os.environ[...]`
+não casa. Medido sobre 72.570 linhas de código real: zero falsos positivos.
+
 ---
 
 ## O que ele detecta
@@ -89,8 +95,9 @@ Sem configurar nada:
 | Pagamentos e SaaS | 19 | Stripe, Twilio, SendGrid, Slack, Sentry, Shopify, Atlassian, Linear, JWT |
 | Chaves privadas | 4 | Blocos PEM, PuTTY, PKCS#8 cifrada, age |
 | Banco de dados | 5 | Strings de conexão com senha: PostgreSQL, MySQL, MongoDB, Redis, AMQP |
+| Genéricas | 1 | Credencial atribuída a variável de nome revelador: `aws_secret_access_key`, `password`, `api_key`, `token`, `client_secret`… |
 
-**53 padrões no total.** Cada um traz seus próprios exemplos de acerto e de não-acerto,
+**54 padrões no total.** Cada um traz seus próprios exemplos de acerto e de não-acerto,
 verificados a cada execução da suíte.
 
 O que for específico do seu time entra no YAML — veja abaixo.

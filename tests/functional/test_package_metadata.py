@@ -75,11 +75,11 @@ def projeto() -> dict:
         "version": bruto["Version"],
         "requires-python": bruto["Requires-Python"],
         "dependencies": bruto.get_all("Requires-Dist") or [],
-        "urls": dict(
-            linha.split(", ", 1) for linha in (bruto.get_all("Project-URL") or [])
-        ),
+        "urls": dict(linha.split(", ", 1) for linha in (bruto.get_all("Project-URL") or [])),
         "scripts": {
-            ep.name: ep.value for ep in entry_points(group="console_scripts") if ep.name == "gitsafety"
+            ep.name: ep.value
+            for ep in entry_points(group="console_scripts")
+            if ep.name == "gitsafety"
         },
     }
 

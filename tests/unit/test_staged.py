@@ -14,8 +14,8 @@ porque o finding existe.
 """
 
 from __future__ import annotations
-import pytest
 
+import pytest
 
 from gitsafety.staged import parse_added_lines, scan_staged
 

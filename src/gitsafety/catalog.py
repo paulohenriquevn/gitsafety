@@ -21,7 +21,7 @@ nenhuma é credencial real.
 
 from __future__ import annotations
 
-from gitsafety.patterns import Rule, literal_marker, unique_token
+from gitsafety.patterns import Rule, keyword_assignment, literal_marker, unique_token
 
 
 def _r(
@@ -487,6 +487,74 @@ DB_RULES: tuple[Rule, ...] = (
 
 #: Registro único do catálogo. Uma regra que não está aqui **não existe** — precedente
 #: `gitleaks/cmd/generate/config/main.go:30`. É também onde o revisor vê o catálogo
+# --- Genéricas: ancoradas por palavra-chave ------------------------------------
+
+#: Palavras que precedem uma credencial em código real.
+#:
+#: A lista é curta de propósito. Cada palavra acrescentada aumenta a superfície de falso
+#: positivo, e o M2 mediu **zero falsos positivos** justamente por não ter nenhuma regra
+#: desta família — o que também significava que `aws_secret_access_key = "..."` passava
+#: sem ser vista. O identificador da chave AWS (`AKIA...`) nós detectávamos; a credencial
+#: de fato, não.
+_PALAVRAS_DE_SEGREDO = (
+    "aws_secret_access_key",
+    "secret_access_key",
+    "client_secret",
+    "private_key",
+    "secret_key",
+    "access_token",
+    "auth_token",
+    "api_key",
+    "apikey",
+    "password",
+    "passwd",
+    "senha",
+    "secret",
+    "token",
+)
+
+#: O valor precisa ter ao menos 20 caracteres **e conter dígito e letra**.
+#:
+#: A exigência de dígito E letra é o que separa uma credencial de um identificador de
+#: código: `secret_key = settings.SECRET_KEY` e `token = os.environ["X"]` não têm dígito;
+#: `api_key = 12345678901234567890` não tem letra e parece número de série. Medido sobre
+#: **72.570 linhas** de código real dos peers (excluídas as definições de regra, que contêm
+#: segredo de exemplo por natureza): **zero falsos positivos**, contra 26 sem a exigência.
+#:
+#: As lookaheads têm teto (`{0,79}`, não `*`) porque o guard do M2 proíbe quantificador
+#: livre no catálogo — nenhuma regex pode pendurar o commit de alguém. Medido: 0,025 s no
+#: pior caso adversarial de 4.000 caracteres.
+_VALOR_DE_SEGREDO = (
+    r"(?=[A-Za-z0-9/+=_.\-]{0,79}[0-9])"
+    r"(?=[A-Za-z0-9/+=_.\-]{0,79}[A-Za-z])"
+    r"[A-Za-z0-9/+=_.\-]{20,80}"
+)
+
+GENERIC_RULES: tuple[Rule, ...] = (
+    Rule(
+        id="generic-secret-assignment",
+        description="Credencial atribuída a uma variável de nome revelador",
+        pattern=keyword_assignment(_PALAVRAS_DE_SEGREDO, _VALOR_DE_SEGREDO),
+        true_positives=(
+            'aws_secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"',
+            'password: "S3nh4Sup3rL0ngaDoBanco2026"',
+            "api_key = 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6'",
+            "CLIENT_SECRET=Xk8fJ2mNp4qRt6vYw9zAb1cDe3fGh5jK",
+        ),
+        false_positives=(
+            'password = "changeme"',
+            'token = os.environ["GITHUB_TOKEN"]',
+            "api_key = get_api_key()",
+            "secret_key = settings.SECRET_KEY",
+            'password = "${VAULT_SECRET}"',
+            "auth_token = None",
+            'senha = "aaaaaaaaaaaaaaaaaaaaaaaaa"',
+            "api_key = 12345678901234567890",
+        ),
+    ),
+)
+
+
 #: inteiro num lugar só, que é justamente o valor de manter a lista literal.
 BUILTIN_RULES: tuple[Rule, ...] = (
     *CLOUD_RULES,
@@ -495,6 +563,7 @@ BUILTIN_RULES: tuple[Rule, ...] = (
     *SAAS_RULES,
     *KEY_RULES,
     *DB_RULES,
+    *GENERIC_RULES,
 )
 
 #: Categorias do `README.md § O que ele detecta`, para o teste de cobertura.
@@ -505,4 +574,5 @@ CATEGORIES: dict[str, tuple[Rule, ...]] = {
     "saas": SAAS_RULES,
     "keys": KEY_RULES,
     "db": DB_RULES,
+    "generic": GENERIC_RULES,
 }

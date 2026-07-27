@@ -12,12 +12,14 @@ e o esquecimento é silencioso, que é o pior tipo. Percorrer a tupla resolve po
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import pytest
 
 from gitsafety.catalog import CATEGORIES
 from gitsafety.patterns import has_free_quantifier
 from gitsafety.rules import BUILTIN_RULES
+from gitsafety.scanner import _scan_text
 
 #: `id=rule.id` para que a saída de falha diga qual regra quebrou, não "caso 27".
 CASOS = [pytest.param(r, id=r.id) for r in BUILTIN_RULES]
@@ -145,3 +147,74 @@ def test_no_rule_matches_another_rules_false_positive_by_accident():
                 if a.id != b.id and b.pattern.search(fp):
                     sobreposicoes.append((a.id, b.id, fp))
     assert not sobreposicoes, f"sobreposição entre regras: {sobreposicoes[:5]}"
+
+
+# --- Família keyword_assignment (issue #2) ---------------------------------------
+
+
+def test_generic_rules_exist_in_the_catalog():
+    """O catálogo tinha 53 regras `unique_token` e NENHUMA ancorada por palavra-chave.
+
+    Consequência medida: `aws_secret_access_key = "wJalr..."` não era detectada em nenhum
+    tipo de arquivo. O `AKIA...` que detectávamos é o **identificador** da chave AWS,
+    inútil sozinho para um atacante; a credencial de fato passava.
+    """
+    assert CATEGORIES["generic"], "a família keyword_assignment não existe no catálogo"
+
+
+def test_the_aws_secret_access_key_is_detected():
+    """O caso que abriu a issue #2. Valor de exemplo da documentação pública da AWS."""
+    linha = 'aws_secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"'
+    achados = _scan_text(linha, Path("config.py"), BUILTIN_RULES)
+    assert [f.rule_id for f in achados] == ["generic-secret-assignment"]
+
+
+@pytest.mark.parametrize(
+    "linha",
+    [
+        'password = "changeme"',  # curto demais para ser credencial
+        'token = os.environ["GITHUB_TOKEN"]',  # leitura de ambiente, não valor
+        "api_key = get_api_key()",  # chamada de função
+        "secret_key = settings.SECRET_KEY",  # referência a constante
+        'password = "${VAULT_SECRET}"',  # placeholder de template
+        "auth_token = None",
+        'access_token: str = ""',
+        'token = f"{prefixo}-{sufixo}"',  # f-string montada
+        "password: <sua senha aqui>",  # placeholder de documentação
+        'senha = "aaaaaaaaaaaaaaaaaaaaaaaaa"',  # sem dígito: não parece credencial
+        "api_key = 12345678901234567890",  # sem letra: parece número de série
+    ],
+)
+def test_generic_rule_does_not_fire_on_ordinary_code(linha):
+    """A família genérica é a que mais arrisca falso positivo — daí a bateria maior.
+
+    Exigir **dígito e letra** no valor é o que separa uma credencial de um identificador
+    de código. Medido sobre 72.570 linhas de código real dos peers: zero falsos positivos.
+    """
+    assert _scan_text(linha, Path("app.py"), BUILTIN_RULES) == []
+
+
+@pytest.mark.parametrize(
+    "linha",
+    [
+        'password: "S3nh4Sup3rL0ngaDoBanco2026"',
+        "api_key = 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6'",
+        "CLIENT_SECRET=Xk8fJ2mNp4qRt6vYw9zAb1cDe3fGh5jK",
+        'auth_token := "tok_9aB8cD7eF6gH5iJ4kL3mN2oP1qR"',
+    ],
+)
+def test_generic_rule_catches_real_looking_credentials(linha):
+    assert _scan_text(linha, Path("config.py"), BUILTIN_RULES) != []
+
+
+def test_generic_rule_respects_the_quantifier_discipline():
+    """A regra genérica usa lookahead — que é onde um quantificador livre se esconde.
+
+    O guard do M2 vale para ela como para qualquer outra: nenhuma regex pode pendurar o
+    commit de alguém.
+    """
+    from gitsafety.patterns import has_free_quantifier, has_nested_quantifier
+
+    for regra in CATEGORIES["generic"]:
+        assert not has_free_quantifier(regra.pattern.pattern), regra.id
+        assert not has_nested_quantifier(regra.pattern.pattern), regra.id

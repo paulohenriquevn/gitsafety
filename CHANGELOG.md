@@ -6,6 +6,11 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Added
 
+- **Credencial atribuída a variável de nome revelador passa a ser detectada** —
+  `aws_secret_access_key = "..."`, `password = "..."`, `api_key = "..."` e semelhantes.
+  Antes só detectávamos valores com prefixo próprio, o que significa que a chave de acesso
+  da AWS era vista e **a chave secreta não** — e é a segunda que dá acesso (#2)
+
 - **Publicado no PyPI**: `pip install gitsafety` (ou `pipx install gitsafety`) funciona em
   máquina limpa. A página do pacote linka o código, o changelog e os issues (#M6)
 
