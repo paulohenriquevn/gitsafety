@@ -27,31 +27,32 @@ from pathlib import Path
 #: custaria uma dependência.
 _CODE_KEYS = ("source", "input")
 
-#: Onde o texto mora em cada tipo de saída — verificado por execução no blueprint (Q3).
-#:
-#: Cobrir só `stream` seria o erro óbvio: é o tipo do `print`, o mais citado, mas
-#: `execute_result` é o que aparece quando a **última expressão da célula** é o valor —
-#: `os.environ` sozinho numa célula produz `execute_result`, não `stream`.
-#:
-#: `error` importa mais do que parece: um traceback salvo carrega a linha que falhou, com
-#: os valores. Uma exceção durante uma chamada autenticada deixa a credencial ali.
-#:
-#: É uma **tabela de dados**, não uma cadeia de `if`, para que um tipo novo do formato seja
-#: uma linha e não um ramo.
-#: O separador faz parte do extrator porque o formato mistura duas convenções. `source` e
-#: `stream.text` são `multiline_string` no schema — os elementos já trazem o `\n`, e juntar
-#: com um inseriria quebra onde não há. `traceback` é `array of string`, uma entrada por
-#: linha e SEM `\n`: juntar sem separador gruda `token=AKIA...` em `ValueError`, e o
-#: delimitador de fim de padrão deixa de casar — falso negativo por concatenação.
-_OUTPUT_TEXT_PATHS: dict[str, tuple[tuple[tuple[str, ...], str], ...]] = {
-    "stream": ((("text",), ""),),
-    "execute_result": ((("data", "text/plain"), ""),),
-    "display_data": ((("data", "text/plain"), ""),),
-    "error": ((("traceback",), "\n"), (("evalue",), "")),
-}
+#: Chaves cujo valor é `array of string` — uma entrada por LINHA, sem `\n` (schema
+#: `nbformat`). Tudo o mais que é lista de strings é `multiline_string`: os elementos já
+#: trazem o `\n` quando há quebra. A distinção é material: juntar `traceback` sem separador
+#: gruda `token=AKIA...` no `ValueError:` da linha seguinte, e o delimitador de fim do
+#: padrão deixa de casar — falso negativo por concatenação. E juntar `source` COM separador
+#: inseriria quebra onde não há, mantendo o falso negativo do valor partido.
+_LINE_ARRAY_KEYS = frozenset({"traceback"})
+
+#: Mime-types pulados. Base64 de imagem não é segredo — nossos 53 padrões são ancorados em
+#: marcadores literais (`AKIA`, `ghp_`, `postgresql://`), que não ocorrem em base64 — e um
+#: PNG embutido é a maior parte dos bytes de um notebook de análise.
+_SKIPPED_MIME_PREFIX = "image/"
 
 CODE_ORIGIN = "código"
 OUTPUT_ORIGIN = "saída"
+METADATA_ORIGIN = "metadados"
+ATTACHMENT_ORIGIN = "anexo"
+OTHER_ORIGIN = "conteúdo"
+
+#: Rótulo por chave da célula. Serve só à MENSAGEM: a cobertura não depende desta tabela,
+#: porque o que não estiver aqui cai em `OTHER_ORIGIN` e é percorrido do mesmo jeito.
+_CELL_ORIGINS = {
+    "outputs": OUTPUT_ORIGIN,
+    "metadata": METADATA_ORIGIN,
+    "attachments": ATTACHMENT_ORIGIN,
+}
 
 
 @dataclass(frozen=True)
@@ -59,7 +60,7 @@ class Segment:
     """Um trecho varrível do notebook, com sua localização."""
 
     text: str
-    cell_index: int  # 1-based, na ordem do arquivo
+    cell_index: int  # 1-based na ordem do arquivo; 0 = fora de qualquer célula
     origin: str  # CODE_ORIGIN ou OUTPUT_ORIGIN
     ordinal: int = 0  # >0 numera saídas da mesma célula, que senão seriam indistinguíveis
 
@@ -70,6 +71,8 @@ class Segment:
         caminho, e incluí-lo aqui produzia `linha 1:1` na saída. A linha vem do `Finding`,
         que é onde ela pertence; aqui fica só o que o `Finding` não sabe representar.
         """
+        if not self.cell_index:
+            return f"{path} :: {self.origin}"
         sufixo = f" {self.ordinal}" if self.ordinal else ""
         return f"{path} :: célula {self.cell_index} ({self.origin}{sufixo})"
 
@@ -104,28 +107,74 @@ def _dig(dados: object, caminho: tuple[str, ...]) -> object:
     return dados
 
 
-def _segments_from_outputs(outputs: object, cell_index: int) -> list[Segment]:
-    """Extrai os segmentos das saídas salvas de uma célula.
+def _collect(
+    node: object,
+    cell_index: int,
+    origin: str,
+    ordinal: int,
+    out: list[Segment],
+    key: str = "",
+) -> None:
+    """Percorre qualquer subárvore do JSON e emite um segmento por texto encontrado.
 
-    Tolera forma inesperada **campo a campo**: `outputs` que não é lista, saída que não é
-    dicionário, `data` sem `text/plain`. Um campo estranho não invalida os demais — abortar
-    o notebook inteiro por causa de uma saída malformada seria trocar um achado parcial por
-    nenhum.
+    **Por que percorrer tudo em vez de extrair campos conhecidos.** A primeira versão do M4
+    listava os campos a varrer — `source`, `input`, e quatro `output_type`. A lista estava
+    errada, e a forma garantia que estivesse: o schema define `data` como *mimebundle*,
+    dicionário de qualquer mime-type, e `text/plain` não é obrigatório. Um segredo em
+    `text/html` (o `repr` de um DataFrame), em `application/json`, nos parâmetros do
+    papermill em `metadata`, num `attachments` de markdown, ou num `output_type` que o
+    Jupyter ainda vai inventar — nenhum estava na lista.
+
+    Toda lista de formatos conhecidos é uma lista desatualizada, e num detector de segredos
+    o custo de esquecer um item é um vazamento silencioso. Percorrer tudo troca "lembrar de
+    incluir" por "decidir excluir" — e a única exclusão é `image/*`, que é justificável.
     """
-    if not isinstance(outputs, list):
-        return []
+    if isinstance(node, str):
+        if node:
+            out.append(Segment(node, cell_index, origin, ordinal))
+        return
 
-    segmentos: list[Segment] = []
-    for ordem, saida in enumerate(outputs, start=1):
-        if not isinstance(saida, dict):
-            continue
-        for caminho, sep in _OUTPUT_TEXT_PATHS.get(saida.get("output_type", ""), ()):
-            texto = _as_text(_dig(saida, caminho), sep)
+    if isinstance(node, list):
+        if node and all(isinstance(item, str) for item in node):
+            texto = _as_text(node, "\n" if key in _LINE_ARRAY_KEYS else "")
             if texto:
-                segmentos.append(
-                    Segment(texto, cell_index, OUTPUT_ORIGIN, len(outputs) > 1 and ordem or 0)
-                )
-    return segmentos
+                out.append(Segment(texto, cell_index, origin, ordinal))
+            return
+        for item in node:
+            _collect(item, cell_index, origin, ordinal, out, key)
+        return
+
+    if isinstance(node, dict):
+        for chave, valor in node.items():
+            if isinstance(chave, str) and chave.startswith(_SKIPPED_MIME_PREFIX):
+                continue
+            _collect(valor, cell_index, origin, ordinal, out, chave)
+
+
+def _segments_from_cell(celula: dict, cell_index: int) -> list[Segment]:
+    """Segmentos de uma célula: o código primeiro, depois tudo o mais que ela carregue."""
+    out: list[Segment] = []
+
+    for chave in _CODE_KEYS:
+        # A parada é por CONTEÚDO, não por presença: uma célula com `source: []` vazio e o
+        # código em `input` (v3) faria um `break` por presença pular o `input`.
+        texto = _as_text(celula.get(chave))
+        if texto:
+            out.append(Segment(texto, cell_index, CODE_ORIGIN))
+            break
+
+    for chave, valor in celula.items():
+        if chave in _CODE_KEYS:
+            continue
+        if chave == "outputs" and isinstance(valor, list):
+            # A saída é numerada porque duas saídas na mesma célula seriam indistinguíveis
+            # na localização — e o usuário precisa saber de qual remover.
+            for ordem, saida in enumerate(valor, start=1):
+                _collect(saida, cell_index, OUTPUT_ORIGIN, ordem if len(valor) > 1 else 0, out)
+            continue
+        _collect(valor, cell_index, _CELL_ORIGINS.get(chave, OTHER_ORIGIN), 0, out, chave)
+
+    return out
 
 
 def _extract_cells(documento: dict) -> list | None:
@@ -177,17 +226,32 @@ def parse_notebook(raw: str) -> list[Segment] | None:
 
     segmentos: list[Segment] = []
     for indice, celula in enumerate(celulas, start=1):
-        if not isinstance(celula, dict):
+        if isinstance(celula, dict):
+            segmentos.extend(_segments_from_cell(celula, indice))
+
+    # O que vive fora das células — `metadata` do notebook é onde o papermill grava os
+    # parâmetros da execução, e um deles pode ser a credencial. `cell_index=0` porque não
+    # pertence a célula nenhuma, e dizer "célula 0" seria mentira.
+    for chave, valor in documento.items():
+        if chave in ("cells", "worksheets"):
             continue
-
-        for chave in _CODE_KEYS:
-            # A parada é por CONTEÚDO, não por presença: uma célula com `source: []` vazio
-            # e o código em `input` (v3) fazia o `break` disparar antes de olhar `input`.
-            texto = _as_text(celula.get(chave))
-            if texto:
-                segmentos.append(Segment(texto, indice, CODE_ORIGIN))
-                break
-
-        segmentos.extend(_segments_from_outputs(celula.get("outputs"), indice))
+        rotulo = f"{METADATA_ORIGIN} do notebook" if chave == "metadata" else OTHER_ORIGIN
+        _collect(valor, 0, rotulo, 0, segmentos, chave)
 
     return segmentos
+
+
+def unescape(secret: str) -> str:
+    """Devolve o valor como ele existe no documento, não como o JSON o grafou.
+
+    `json.dumps` grava `ã` como `\\u00e3` por padrão, então a varredura do arquivo bruto vê
+    uma string e a do notebook parseado vê outra — a MESMA ocorrência com duas grafias. Sem
+    normalizar, a fusão não as reconhece como a mesma coisa e reporta a ocorrência duas
+    vezes, uma delas exibindo um valor que não existe em lugar nenhum do arquivo.
+    """
+    try:
+        return json.loads(f'"{secret}"')
+    except ValueError:
+        # Aspas ou barra soltas no valor: não é um literal JSON válido, então não houve
+        # escape a desfazer.
+        return secret

@@ -16,6 +16,16 @@ from gitsafety.notebook import CODE_ORIGIN, OUTPUT_ORIGIN, is_notebook, parse_no
 PG = "postgresql://app:s3nh4Sup3r@db.exemplo.com/prod"
 
 
+def _de(segs, origem: str) -> list:
+    """Segmentos de uma origem.
+
+    O percurso é genérico — emite segmento para todo texto do documento, inclusive valores
+    estruturais como o `"code"` de `cell_type`. Selecionar por posição no resultado seria
+    frágil; selecionar por origem é o que os testes realmente querem dizer.
+    """
+    return [s for s in segs if s.origin == origem]
+
+
 def _nb(cells: list[dict], **extra) -> str:
     return json.dumps({"cells": cells, "metadata": {}, "nbformat": 4, **extra})
 
@@ -39,10 +49,10 @@ def test_is_notebook_recognises_the_extension():
 
 
 def test_code_cell_becomes_a_segment():
-    segs = parse_notebook(_nb([_code(["x = 1\n"])]))
+    segs = _de(parse_notebook(_nb([_code(["x = 1\n"])])), CODE_ORIGIN)
     assert len(segs) == 1
     assert segs[0].cell_index == 1
-    assert segs[0].origin == CODE_ORIGIN
+    assert segs[0].text == "x = 1\n"
 
 
 def test_source_as_string_is_accepted():
@@ -111,7 +121,7 @@ def test_traceback_lines_are_joined_with_newline():
         "traceback": ["  chamada(", "    token=abc", "ValueError: bad"],
     }
     segs = parse_notebook(_nb([_code(["x\n"], [out])]))
-    texto = next(s.text for s in segs if s.origin == OUTPUT_ORIGIN)
+    texto = next(s.text for s in segs if s.text.startswith("  chamada("))
     assert texto.splitlines() == ["  chamada(", "    token=abc", "ValueError: bad"]
 
 
@@ -121,10 +131,8 @@ def test_multiple_outputs_in_one_cell_are_distinguishable():
         {"output_type": "stream", "name": "stdout", "text": ["a\n"]},
         {"output_type": "stream", "name": "stderr", "text": ["b\n"]},
     ]
-    segs = [
-        s for s in parse_notebook(_nb([_code(["x\n"], saidas)])) if s.origin == OUTPUT_ORIGIN
-    ]
-    locais = {s.locate(Path("nb.ipynb")) for s in segs}
+    segs = parse_notebook(_nb([_code(["x\n"], saidas)]))
+    locais = {s.locate(Path("nb.ipynb")) for s in segs if s.text in ("a\n", "b\n")}
     assert len(locais) == 2, locais
 
 
@@ -144,8 +152,10 @@ def test_split_value_is_rejoined():
 
 
 def test_cell_index_is_one_based_and_in_file_order():
-    segs = parse_notebook(_nb([_code(["a\n"]), _code(["b\n"]), _code(["c\n"])]))
-    assert [s.cell_index for s in segs] == [1, 2, 3]
+    segs = _de(
+        parse_notebook(_nb([_code(["a\n"]), _code(["b\n"]), _code(["c\n"])])), CODE_ORIGIN
+    )
+    assert [(s.cell_index, s.text) for s in segs] == [(1, "a\n"), (2, "b\n"), (3, "c\n")]
 
 
 # --- Os quatro tipos de saída (ADR D3) -----------------------------------------
@@ -190,7 +200,7 @@ def test_error_traceback_is_scanned():
 
 def test_locate_reports_cell_and_line_within_the_cell():
     """O ponto do milestone: a linha do JSON não serve a quem abre o notebook."""
-    segs = parse_notebook(_nb([_code(["a\n"]), _code(["b\n", "c\n"])]))
+    segs = _de(parse_notebook(_nb([_code(["a\n"]), _code(["b\n", "c\n"])])), CODE_ORIGIN)
     texto = segs[1].locate(Path("nb.ipynb"))
     assert "célula 2" in texto
     assert "nb.ipynb" in texto
@@ -200,8 +210,10 @@ def test_locate_distinguishes_code_from_output():
     segs = parse_notebook(
         _nb([_code(["x\n"], [{"output_type": "stream", "name": "stdout", "text": ["s\n"]}])])
     )
-    assert CODE_ORIGIN in segs[0].locate(Path("nb.ipynb"))
-    assert OUTPUT_ORIGIN in segs[1].locate(Path("nb.ipynb"))
+    codigo = _de(segs, CODE_ORIGIN)[0]
+    saida = next(s for s in _de(segs, OUTPUT_ORIGIN) if s.text == "s\n")
+    assert CODE_ORIGIN in codigo.locate(Path("nb.ipynb"))
+    assert OUTPUT_ORIGIN in saida.locate(Path("nb.ipynb"))
 
 
 # --- Casos negativos e degradação (ADR D4) -------------------------------------
@@ -224,26 +236,30 @@ def test_top_level_list_returns_none():
 def test_unexpected_field_shape_does_not_abort_the_notebook():
     """Um campo estranho não pode invalidar as demais células."""
     ruim = {"cell_type": "code", "source": ["a\n"], "outputs": {}, "metadata": {}}
-    segs = parse_notebook(_nb([ruim, _code(["b\n"])]))
-    assert len(segs) == 2  # o código de ambas, nenhuma saída
+    segs = _de(parse_notebook(_nb([ruim, _code(["b\n"])])), CODE_ORIGIN)
+    assert [s.text for s in segs] == ["a\n", "b\n"]
 
 
 def test_non_dict_cell_is_skipped_without_aborting():
-    segs = parse_notebook(_nb(["nao é dicionário", _code(["b\n"])]))
-    assert len(segs) == 1
+    segs = _de(parse_notebook(_nb(["nao é dicionário", _code(["b\n"])])), CODE_ORIGIN)
+    assert [s.text for s in segs] == ["b\n"]
 
 
-def test_output_without_text_plain_produces_no_segment():
-    """A extração NÃO cobre todo mime — e isso é seguro só porque o texto também é varrido.
+def test_image_payload_is_skipped_but_other_mimes_are_not():
+    """`image/*` é a ÚNICA exclusão — e ela é decidida, não esquecida.
 
-    A afirmação aqui é sobre **segmentos**, não sobre cobertura. Ler este teste como
-    "saída sem `text/plain` não precisa ser verificada" foi o erro que deixou passar
-    `text/html`; a garantia de cobertura vive em `test_notebook_coverage_oracle.py`, que
-    afirma a relação entre os dois caminhos em vez de enumerar formatos.
+    Base64 de PNG não casa com nenhum dos 53 padrões (todos ancorados em marcadores
+    literais) e é a maior parte dos bytes de um notebook de análise. Todo mime que **não**
+    seja imagem é percorrido: a versão anterior cobria só `text/plain` e por isso deixava
+    passar o segredo no `repr` HTML de um DataFrame.
     """
-    out = {"output_type": "display_data", "data": {"image/png": "iVBOR"}, "metadata": {}}
-    segs = parse_notebook(_nb([_code(["x\n"], [out])]))
-    assert [s for s in segs if s.origin == OUTPUT_ORIGIN] == []
+    imagem = {"output_type": "display_data", "data": {"image/png": "iVBOR"}, "metadata": {}}
+    html = {"output_type": "display_data", "data": {"text/html": ["<b>x</b>"]}, "metadata": {}}
+    segs = parse_notebook(_nb([_code(["c\n"], [imagem, html])]))
+
+    textos = [s.text for s in segs]
+    assert "iVBOR" not in textos
+    assert "<b>x</b>" in textos
 
 
 def test_empty_notebook_produces_no_segments():
@@ -258,4 +274,4 @@ def test_markdown_and_raw_cells_are_scanned(tipo):
     """Conteúdo literal que o usuário escreveu — não há razão para tratá-lo diferente."""
     celula = {"cell_type": tipo, "source": ["texto com segredo\n"], "metadata": {}}
     segs = parse_notebook(_nb([celula]))
-    assert segs and "texto com segredo" in segs[0].text
+    assert any("texto com segredo" in s.text for s in segs)

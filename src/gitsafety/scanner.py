@@ -15,7 +15,7 @@ from re import Pattern
 from typing import TYPE_CHECKING
 
 from gitsafety.finding import Finding
-from gitsafety.notebook import is_notebook, parse_notebook
+from gitsafety.notebook import is_notebook, parse_notebook, unescape
 from gitsafety.rules import BUILTIN_RULES, Rule
 from gitsafety.walker import SkippedFile, walk
 
@@ -109,24 +109,32 @@ def _scan_notebook(
     path: Path,
     rules: Sequence[Rule],
     allow: Sequence[Pattern[str]] = (),
-) -> list[Finding] | None:
+) -> tuple[list[Finding], set[tuple[str, str]]] | None:
     """Varre um notebook parseado. Devolve `None` para sinalizar degradação (ADR D4).
 
     A localização — célula e linha **dentro** da célula — é codificada no `path` do
     `Finding`. Codificar ali, em vez de acrescentar campo à dataclass, é o que mantém o
     milestone aditivo: `cli.render` só imprime `f.path` e não precisa saber de notebooks,
     e os quatro milestones que consomem `Finding` seguem intocados.
+
+    Devolve também o que foi **deliberadamente suprimido**. Sem isso, um
+    `# gitsafety: allow` numa linha que o Jupyter partiu em dois elementos era desfeito
+    pela fusão: o parser juntava, via o marcador e suprimia; a varredura de texto via o
+    segredo numa linha do JSON onde o marcador não estava, e o reintroduzia. A supressão
+    pedida pelo usuário não pode depender de onde o Jupyter escolheu quebrar a linha.
     """
     segmentos = parse_notebook(raw)
     if segmentos is None:
         return None
 
     findings: list[Finding] = []
+    suprimidos: set[tuple[str, str]] = set()
     for segmento in segmentos:
         for numero, linha in enumerate(segmento.text.splitlines(), start=1):
             for rule in rules:
                 for match in rule.pattern.finditer(linha):
                     if is_allowed(match.group(0), linha, allow):
+                        suprimidos.add((rule.id, match.group(0)))
                         continue
                     findings.append(
                         Finding(
@@ -136,11 +144,11 @@ def _scan_notebook(
                             secret=match.group(0),
                         )
                     )
-    return findings
+    return findings, suprimidos
 
 
 def _merge_notebook(
-    do_notebook: list[Finding] | None,
+    do_notebook: tuple[list[Finding], set[tuple[str, str]]] | None,
     do_texto: list[Finding],
 ) -> list[Finding]:
     """Combina os dois caminhos de modo que o parsing **nunca** cubra menos que o texto.
@@ -160,24 +168,35 @@ def _merge_notebook(
     consumido por um achado localizado equivalente, e o que sobra entra com a localização
     bruta. Pior localização é infinitamente melhor que silêncio.
 
-    A contagem é por ocorrência, não por conjunto: o mesmo segredo em duas células são dois
-    achados, e colapsá-los esconderia um dos lugares onde ele precisa ser removido.
+    A contagem é por **ocorrência**, não por conjunto: o mesmo segredo em duas células são
+    dois achados, e colapsá-los esconderia um dos lugares de onde ele precisa ser removido.
+    Por isso o parser percorre o documento inteiro — se ele enxergasse menos lugares que a
+    varredura de texto, uma ocorrência que só ele vê (valor partido) consumiria uma
+    ocorrência que só o texto vê, e a segunda desapareceria do relatório.
+
+    A comparação é sobre o valor **desescapado**: o arquivo bruto e o documento parseado
+    grafam o mesmo segredo de formas diferentes quando há não-ASCII.
     """
     if do_notebook is None:
         # JSON não parseou. O texto já foi varrido — degradação para o comportamento dos
         # milestones anteriores, que é um estado conhecido (ADR D4).
         return do_texto
 
-    cobertos = Counter((f.rule_id, f.secret) for f in do_notebook)
+    localizados, suprimidos = do_notebook
+    cobertos = Counter((f.rule_id, unescape(f.secret)) for f in localizados)
+    suprimidos = {(rid, unescape(s)) for rid, s in suprimidos}
+
     extras = []
     for finding in do_texto:
-        chave = (finding.rule_id, finding.secret)
+        chave = (finding.rule_id, unescape(finding.secret))
+        if chave in suprimidos:
+            continue
         if cobertos[chave]:
             cobertos[chave] -= 1
         else:
             extras.append(finding)
 
-    return do_notebook + extras
+    return localizados + extras
 
 
 def scan_path(

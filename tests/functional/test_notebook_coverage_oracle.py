@@ -9,9 +9,11 @@ lembramos de cobrir. Um formato novo do Jupyter é uma linha nova aqui, não um 
 from __future__ import annotations
 
 import json
+from collections import Counter
 
 import pytest
 
+from gitsafety.notebook import unescape
 from gitsafety.rules import BUILTIN_RULES
 from gitsafety.scanner import _scan_text, scan_path
 
@@ -99,8 +101,13 @@ def test_parsed_path_never_finds_less_than_text_path(nome, tmp_path):
     nb = tmp_path / "a.ipynb"
     nb.write_text(bruto, encoding="utf-8")
 
-    parseado = {(f.rule_id, f.secret) for f in scan_path(nb).findings}
-    texto = {(f.rule_id, f.secret) for f in _scan_text(bruto, nb, BUILTIN_RULES)}
+    # `Counter`, não `set`: comparar conjuntos esconde subcontagem — dois lugares com o
+    # mesmo valor viram um elemento só, e foi por isso que este oráculo passou verde
+    # enquanto uma ocorrência real era engolida pela fusão.
+    parseado = Counter((f.rule_id, unescape(f.secret)) for f in scan_path(nb).findings)
+    texto = Counter(
+        (f.rule_id, unescape(f.secret)) for f in _scan_text(bruto, nb, BUILTIN_RULES)
+    )
 
     faltando = texto - parseado
     assert not faltando, f"{nome}: o caminho parseado perdeu {faltando}"
