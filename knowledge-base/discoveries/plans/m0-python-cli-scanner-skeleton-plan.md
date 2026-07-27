@@ -1,5 +1,13 @@
 # Discovery Plan: Esqueleto de CLI Python para varredura de arquivos (M0)
 
+> **Version 1.1** (2026-07-27) — absorve os 3 MUST FIX de
+> `knowledge-base/reviews/m0-python-cli-scanner-skeleton-edge-cases-2026-07-27.md`:
+> EC-1 (testes por regra do gitleaks estão em `cmd/generate/config/rules/`, não em
+> `detect/`), EC-2 (o comando de scan do ggshield está bloqueado pelo mesmo deny-glob
+> do D3 — Q2/Q3 restritas a `core/` e marcadas como confiança reduzida) e EC-3 (Fase A
+> de Q2 buscava byte NUL literal; trocado pelas grafias em código). Os 3 SHOULD TEST
+> viraram checkpoints do halt-loop.
+>
 > **Version 1.0** — Investiga como peers maduros de detecção de segredos estruturam o
 > esqueleto que o M0 precisa entregar: empacotamento de CLI Python com entry point,
 > travessia de arquivos com descarte de binário e limite de tamanho, contrato de exit
@@ -53,7 +61,7 @@ Critérios de sucesso mensuráveis:
 | Projeto | Subdiretórios em escopo | Motivo |
 |---|---|---|
 | `knowledge-base/references/ggshield/` | `pyproject.toml`, `setup.cfg`, `Makefile`, `ggshield/__main__.py`, `ggshield/core/errors.py`, `ggshield/core/filter.py`, `ggshield/core/lines.py`, `ggshield/core/scan/`, `ggshield/core/config/`, `tests/` | **Peer primário.** Única CLI Python legível (ver D3). Mesma stack, mesmo público, empacotamento moderno. |
-| `knowledge-base/references/gitleaks/` | `main.go`, `sources/`, `detect/`, `testdata/`, `Makefile` | Contrato de exit code e travessia de fontes. Go — comparação de **contrato**, nunca de código. |
+| `knowledge-base/references/gitleaks/` | `main.go`, `sources/`, `detect/`, `testdata/`, `Makefile`, `cmd/generate/config/rules/` | Contrato de exit code e travessia de fontes. `cmd/generate/config/rules/` é onde vive a estrutura de teste por regra — incluído por EC-1. Go — comparação de **contrato**, nunca de código. |
 | `knowledge-base/references/talisman/` | `cmd/`, `scanner/`, `detector/` | Contrato de saída do hook. Escopo mínimo — o peso dele é no M1, não no M0. |
 
 ### Out-of-Scope (explícito)
@@ -61,10 +69,10 @@ Critérios de sucesso mensuráveis:
 | Projeto / Subdir | Por que excluído |
 |---|---|
 | `knowledge-base/references/detect-secrets/`, `ripsecrets/`, `secretlint/` | **Inacessíveis** — ver ADR D3. Não é escolha editorial, é bloqueio de permissão. |
-| `knowledge-base/references/ggshield/ggshield/cmd/secret/` | Mesmo bloqueio de permissão (o path contém `secret`). |
+| `gitleaks/report_templates/` e `gitleaks/config/` (formatos de report e config TOML) | Cortados no `docs/PRD.md § 10`. **A exclusão de `gitleaks/config/` NÃO alcança `gitleaks/cmd/generate/config/rules/`**, que está em escopo por EC-1. |
 | `ggshield/ggshield/verticals/`, `ggshield/ggshield/cmd/{ai,auth,hmsl,honeytoken,machine,quota}` | Funcionalidades de produto comercial com backend remoto — não-objetivo declarado (`docs/PRD.md § 5 NG2`). |
 | `ggshield/docker/`, `ggshield/Dockerfile`, `ggshield/actions*/` | Docker é não-objetivo explícito (`docs/PRD.md § 5 NG6`). |
-| `gitleaks/report_templates/`, `gitleaks/config/` | Formatos de report e config TOML — ambos cortados no `docs/PRD.md § 10`. |
+| `ggshield/ggshield/cmd/` inteiro, incluindo `cmd/secret/` | Bloqueado pelo mesmo deny-glob do D3 — ver consequência declarada lá. Q2 e Q3 ficam restritas a `ggshield/core/`. |
 | `talisman/` fora de `cmd/`, `scanner/`, `detector/` | Instalação global e prompts pertencem ao M1. |
 | Qualquer projeto não clonado em `knowledge-base/references/` | Nunca afirmar comportamento de um projeto sem ler a fonte. |
 
@@ -148,6 +156,13 @@ origem. (c) Prosseguir sem declarar — viola a Regra Inquebrável 3.
 Python (ggshield). O blueprint DEVE marcar toda conclusão que se beneficiaria de
 `detect-secrets` como confiança reduzida. Recomendação ao humano registrada no blueprint.
 
+**Consequência adicional (EC-2, absorvida em v1.1):** o mesmo glob bloqueia
+`ggshield/ggshield/cmd/secret/` — o comando de scan do próprio ggshield, onde mora a
+**política** que orquestra as primitivas de `core/`. Não é exclusão menor de escopo: Q2
+e Q3 passam a ler apenas as primitivas em `ggshield/core/`, sem a política que as usa.
+Toda conclusão de Q2/Q3 sobre o ggshield é, portanto, **de confiança reduzida** e o
+blueprint deve dizer isso na própria frase, não em nota de rodapé.
+
 ### D4 — Peers em Go entram como contrato, nunca como código
 
 **Decisão:** de `gitleaks` e `talisman` extrair apenas **contratos observáveis** —
@@ -167,10 +182,10 @@ Python.
 | # | Questão | Corner | Projeto(s) | Fase A (mapa amplo) | Fase B (leitura profunda) | Formato esperado |
 |---|---|---|---|---|---|---|
 | Q1 | Como o ggshield declara o entry point do console e qual o piso de versão do Python? | techniques | ggshield | SKIP Fase A — forma textual. Ler `knowledge-base/references/ggshield/pyproject.toml` e `setup.cfg` | Leitura integral de ambos (D2) | Bloco de configuração exato do entry point + piso de versão + citação `arquivo:linha` |
-| Q2 | Qual heurística decide que um arquivo deve ser pulado (binário, tamanho, caminho) e onde ela mora? | techniques | ggshield, gitleaks | Grep por `binary`, `is_binary`, `\x00`, `max_size`, `MAX_` em `knowledge-base/references/ggshield/ggshield/core/` e `knowledge-base/references/gitleaks/sources/` | Ler cada hotspot; capturar a heurística e o comentário que a justifica | Tabela: sinal → limiar → arquivo:linha → o que acontece com falso positivo |
-| Q3 | Qual o contrato de exit code de cada peer e como distinguem "achou segredo" de "erro de execução"? | techniques | ggshield, gitleaks, talisman | Grep por `exit`, `ExitCode`, `sys.exit`, `os.Exit` em `knowledge-base/references/ggshield/ggshield/core/errors.py`, `knowledge-base/references/gitleaks/main.go`, `knowledge-base/references/talisman/cmd/` | Ler `errors.py` integralmente (contrato, D2); nos Go, ler só os hotspots | Tabela comparativa: peer → código → significado → citação |
+| Q2 | Qual heurística decide que um arquivo deve ser pulado (binário, tamanho, caminho) e onde ela mora? | techniques | ggshield (**só `core/`** — EC-2), gitleaks | Grep por `binary`, `is_binary`, `max_size`, `MAX_` e pelas **grafias de byte NUL em código** — `\x00`, `\0`, `b"\0"`, `NUL` (EC-3; nunca o byte literal) — em `knowledge-base/references/ggshield/ggshield/core/` e `knowledge-base/references/gitleaks/sources/` | Ler cada hotspot; capturar a heurística e o comentário que a justifica | Tabela: sinal → limiar → arquivo:linha → o que acontece com falso positivo. **Forma alternativa aceita (EC-6):** "delegado à dependência X", quando for o caso |
+| Q3 | Qual o contrato de exit code de cada peer e como distinguem "achou segredo" de "erro de execução"? | techniques | ggshield (**só `core/`** — EC-2), gitleaks, talisman | Grep por `exit`, `ExitCode`, `sys.exit`, `os.Exit` em `knowledge-base/references/ggshield/ggshield/core/errors.py`, `knowledge-base/references/gitleaks/main.go`, `knowledge-base/references/talisman/cmd/`. **Fallback (EC-4):** se `talisman/cmd/` não retornar, ampliar uma vez para a raiz de `talisman/` antes de marcar BLOCKED | Ler `errors.py` integralmente (contrato, D2); nos Go, ler só os hotspots | Tabela comparativa: peer → código → significado → citação. Acomodar código de saída **configurável** (valor default + flag que o altera) |
 | Q4 | Como o ggshield organiza a suíte de testes entre unitário, integração e ponta a ponta? | tests | ggshield | `ls knowledge-base/references/ggshield/tests/` + Grep por `conftest`, `fixture`, `tmp_path` | Ler os `conftest.py` e 2-3 testes representativos de cada nível | Árvore de diretórios anotada com o nível da pirâmide + convenção de nome |
-| Q5 | Como o gitleaks estrutura o caso de teste de uma regra de detecção (acerto e não-acerto)? | tests | gitleaks | `ls knowledge-base/references/gitleaks/testdata/` + Grep por `func Test` em `knowledge-base/references/gitleaks/detect/` | Ler um teste de regra ponta a ponta com seu fixture | Formato do par (fixture, asserção) + como o não-acerto é expresso |
+| Q5 | Como o gitleaks estrutura o caso de teste de uma regra de detecção (acerto e não-acerto)? | tests | gitleaks | **Alvo primário (EC-1):** `ls knowledge-base/references/gitleaks/cmd/generate/config/rules/` — um arquivo por regra, é ali que mora o padrão procurado. Complementar: `ls knowledge-base/references/gitleaks/testdata/` + Grep por `func Test` em `knowledge-base/references/gitleaks/detect/` | Ler 2-3 arquivos de regra ponta a ponta com seus casos de acerto e não-acerto | Formato do par (fixture, asserção) + como o não-acerto é expresso + arquivo:linha |
 | Q6 | Quais dependências de runtime o ggshield declara, e quais delas o gitsafety conseguiria evitar? | deps | ggshield | SKIP Fase A — forma textual. Ler `knowledge-base/references/ggshield/pyproject.toml` | Leitura integral; classificar cada dep em essencial / evitável para o nosso escopo | Tabela: dep → propósito → o gitsafety precisa? → alternativa na stdlib |
 | Q7 | Que parser de configuração o ggshield usa e como reporta erro de config malformada ao usuário? | deps | ggshield | Grep por `yaml`, `safe_load`, `ValidationError` em `knowledge-base/references/ggshield/ggshield/core/config/` | Ler o carregador de config e o caminho de erro | Nome do parser + formato da mensagem de erro + citação (insumo direto do FR-23) |
 | Q8 | Qual o ferramental de build/test/lint e como o comando de teste é exposto? | tools | ggshield, gitleaks | SKIP Fase A — forma textual. Ler `knowledge-base/references/ggshield/Makefile`, `knowledge-base/references/ggshield/setup.cfg`, `knowledge-base/references/gitleaks/Makefile` | Leitura integral dos três | Lista de alvos + comando de teste canônico de cada peer |
@@ -199,6 +214,9 @@ mínimo 1 por corner ✓.
 | Sanidade de meio de loop | Toda afirmação sobre comportamento de peer tem citação | Adicionar citação ao parágrafo sem lastro (1 tentativa) |
 | Orçamento por projeto | Orçamento do D1 não esgotado | Ao esgotar, marcar as questões restantes daquele projeto BLOCKED; avançar |
 | Peer inacessível | Nenhuma afirmação sobre detect-secrets / ripsecrets / secretlint | Remover a afirmação — D3 proíbe |
+| Ordem Q3 → Q7 (EC-5) | Q3 respondida antes de Q7 começar | Adiar Q7; o caminho de erro de config passa por `core/errors.py`, alvo de Q3 — responder fora de ordem duplica leitura e arrisca duas descrições divergentes do mesmo módulo |
+| Fallback do talisman (EC-4) | Q3 tentou `talisman/cmd/` E, se vazio, a raiz de `talisman/` | Só marcar BLOCKED após as duas tentativas — o talisman tem o menor orçamento e é o mais fácil de abandonar cedo por engano |
+| Confiança de Q2/Q3 sobre ggshield (EC-2) | Toda conclusão sobre ggshield em Q2/Q3 declara, na própria frase, que a política em `cmd/secret/` não foi lida | Reescrever a frase; nota de rodapé não satisfaz |
 | Antes de prometer completo | Os 4 corners têm seção preenchida | Recusar a promessa; continuar iterando |
 
 ## Acceptance Criteria
