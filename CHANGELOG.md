@@ -48,6 +48,11 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 - Um segredo em campo de forma inesperada, em imagem embutida, ou em duas saídas
   consecutivas sem quebra de linha entre elas volta a ser reportado — antes o notebook
   podia esconder o que a varredura de um arquivo comum encontraria (#M4)
+- Um valor parecido com um segredo mas que não é um (a chave dentro de um nome de arquivo,
+  por exemplo) não faz mais o mesmo segredo ser reportado duas vezes nem faz um
+  `# gitsafety: allow` deixar de valer (#M4)
+- Os achados de um notebook saem na ordem do arquivo, também quando ele foi salvo sem
+  indentação (#M4)
 
 ### Deprecated
 

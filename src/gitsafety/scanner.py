@@ -16,9 +16,9 @@ from typing import TYPE_CHECKING
 from gitsafety.finding import Finding
 from gitsafety.notebook import (
     is_notebook,
-    occurrences_per_line,
     parse_notebook,
     unescape,
+    written_forms,
 )
 from gitsafety.rules import BUILTIN_RULES, Rule
 from gitsafety.walker import SkippedFile, walk
@@ -154,6 +154,7 @@ def _localise(
     do_texto: list[Finding],
     do_notebook: list[tuple[Finding, bool]] | None,
     raw: str,
+    rules: Sequence[Rule],
 ) -> list[Finding]:
     """Usa o documento parseado para MELHORAR a localização do que o texto já encontrou.
 
@@ -182,9 +183,14 @@ def _localise(
         return do_texto
 
     linhas = raw.splitlines()
-    localizados = _assign_raw_lines(do_notebook, linhas)
+    localizados = _assign_raw_lines(do_notebook, linhas, rules)
 
-    resultado: list[Finding] = []
+    # Cada achado carrega a linha bruta a que pertence, para que o relatório saia na ordem
+    # do arquivo. Sem isso, os achados que o texto não produziu eram anexados no fim, e num
+    # notebook minificado — onde tudo cai na linha 1 — as células saíam fora de ordem.
+    # Nenhum achado se perde por isso, mas um relatório desordenado é mais difícil de
+    # conferir, e conferir é o que o usuário faz com ele.
+    ordenado: list[tuple[int, Finding]] = []
     usados: set[int] = set()
     for bruto in do_texto:
         par = next(
@@ -200,12 +206,12 @@ def _localise(
         )
         if par is None:
             # O texto achou algo que o percurso não alcançou. Vale com a localização bruta.
-            resultado.append(bruto)
+            ordenado.append((bruto.line, bruto))
             continue
         usados.add(par)
         finding, suprimido, _ = localizados[par]
         if not suprimido:
-            resultado.append(finding)
+            ordenado.append((bruto.line, finding))
 
     # Todo achado do parser que sobrou e não foi suprimido entra por conta própria. São
     # duas situações, e ambas são achados reais que o texto não produziu:
@@ -216,17 +222,45 @@ def _localise(
     #   gravado sem indentação põe o arquivo inteiro numa linha só, onde um único
     #   `# gitsafety: allow` calaria todos os segredos do documento. O parser vê a linha da
     #   célula, que é a que o usuário escreveu, e é a leitura correta.
-    resultado.extend(
-        finding
-        for indice, (finding, suprimido, _) in enumerate(localizados)
+    ordenado.extend(
+        (linha if linha is not None else len(linhas) + 1, finding)
+        for indice, (finding, suprimido, linha) in enumerate(localizados)
         if indice not in usados and not suprimido
     )
-    return resultado
+    # `sorted` é estável: empates mantêm a ordem do documento, que é a ordem das células.
+    return [finding for _, finding in sorted(ordenado, key=lambda par: par[0])]
+
+
+def _rule_matches_per_line(
+    rule: Rule,
+    secret: str,
+    linhas: list[str],
+) -> dict[int, int]:
+    """Quantas vezes ESTA regra casa ESTE valor em cada linha bruta — 1-based.
+
+    Conta casamento de regra, não ocorrência de substring. A diferença é material: um
+    `AKIAIOSFODNN7EXAMPLE-old` num nome de arquivo contém o valor mas **não é** um segredo,
+    porque o delimitador de fim do padrão o recusa. Contado como substring, ele criaria uma
+    vaga de linha que o ponteiro consumiria, desalinhando todas as ocorrências seguintes —
+    o que produzia achado duplicado e, num arranjo específico, fazia o `allow` do usuário
+    ser ignorado.
+
+    A vaga tem de corresponder ao que a varredura de texto de fato reportaria naquela linha.
+    Qualquer aproximação aqui é um desalinhamento à espera de acontecer.
+    """
+    grafias = written_forms(secret)
+    contagem: dict[int, int] = {}
+    for numero, linha in enumerate(linhas, start=1):
+        total = sum(1 for match in rule.pattern.finditer(linha) if match.group(0) in grafias)
+        if total:
+            contagem[numero] = total
+    return contagem
 
 
 def _assign_raw_lines(
     do_notebook: list[tuple[Finding, bool]],
     linhas: list[str],
+    rules: Sequence[Rule],
 ) -> list[tuple[Finding, bool, int | None]]:
     """Diz, para cada achado do parser, em que linha bruta ESTA ocorrência está.
 
@@ -243,14 +277,18 @@ def _assign_raw_lines(
     `None` significa que a ocorrência não existe em nenhuma linha isolada — valor partido
     entre elementos pelo Jupyter.
     """
-    capacidades: dict[str, dict[int, int]] = {}
-    ponteiros: dict[str, int] = {}
+    por_id = {regra.id: regra for regra in rules}
+    capacidades: dict[tuple[str, str], dict[int, int]] = {}
+    ponteiros: dict[tuple[str, str], int] = {}
 
     atribuidos: list[tuple[Finding, bool, int | None]] = []
     for finding, suprimido in do_notebook:
-        segredo = finding.secret
+        segredo = (finding.rule_id, finding.secret)
         if segredo not in capacidades:
-            capacidades[segredo] = occurrences_per_line(segredo, linhas)
+            regra = por_id.get(finding.rule_id)
+            capacidades[segredo] = (
+                _rule_matches_per_line(regra, finding.secret, linhas) if regra else {}
+            )
             ponteiros[segredo] = 0
 
         capacidade = capacidades[segredo]
@@ -294,7 +332,9 @@ def scan_path(
         do_texto = _scan_text(bruto, path, regras, cfg.allow)
         if is_notebook(path):
             findings.extend(
-                _localise(do_texto, _scan_notebook(bruto, path, regras, cfg.allow), bruto)
+                _localise(
+                    do_texto, _scan_notebook(bruto, path, regras, cfg.allow), bruto, regras
+                )
             )
         else:
             findings.extend(do_texto)

@@ -32,7 +32,7 @@ Nenhuma regex de linha atravessa isso; juntar antes de varrer, sim.
 |---|---|---|
 | Segredos achados (notebook de 5) | 4 | **5** |
 | Localização | linha do JSON | célula + linha dentro dela |
-| Testes | 542 | **913** |
+| Testes | 542 | **1513** |
 
 Exemplo real, do repositório de validação de integração:
 
@@ -183,7 +183,7 @@ silencioso.
 
 | Gate | Verdicto |
 |---|---|
-| Suíte | 913 passando (301 deles gerados por fuzz diferencial) |
+| Suíte | 1513 passando (901 deles gerados por fuzz diferencial) |
 | `ruff check` / `format` | limpo |
 | `/code-quality` | `FAIL_SOFT` — 0 HARD; os 6 achados são de `.claude/skills/`, cobertos pelo ADR 0001; `vulture src/ benchmarks/` não acha nada no produto |
 | `--staged` não regride (D5) | `git diff --name-only` não contém `staged.py` nem `cli.py`; os 7 testes e2e do M1 seguem verdes |

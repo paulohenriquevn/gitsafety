@@ -150,3 +150,88 @@ def test_the_generator_actually_plants_secrets():
         if _scan_text(_notebook(semente), Path("a.txt"), BUILTIN_RULES)
     )
     assert com_achado > 250, f"só {com_achado}/300 documentos têm segredo detectável"
+
+
+# --- Fuzz de supressão × isca ---------------------------------------------------
+#
+# O gerador acima deliberadamente não planta `# gitsafety: allow`, porque a supressão é
+# razão legítima para reportar menos que o texto. Mas isso deixou sem cobertura justamente
+# a interação que produziu três defeitos — N2, P1 e o desalinhamento do ponteiro. Aqui a
+# propriedade é outra e mais forte: **nenhum segredo que o usuário NÃO pediu para suprimir
+# pode desaparecer**, mesmo com iscas por perto.
+#
+# A isca é uma superstring que a regra recusa (`AKIA...-old` num nome de arquivo). Ela não
+# é segredo, mas contém o valor — e contá-la como ocorrência desalinhava o pareamento.
+
+ISCA = f"arquivo = 'chaves/{SEGREDOS[0]}-old.json'\n"
+
+
+def _quantos(achados, segredo: str) -> int:
+    """Quantos achados correspondem a este segredo plantado.
+
+    A comparação é por prefixo, não por igualdade: uma regra pode casar só a parte que a
+    identifica — a de conexão postgres para no host, sem o caminho do banco. Exigir
+    igualdade faria o teste falhar por uma diferença que é do catálogo, não do notebook.
+    """
+    return sum(1 for f in achados if segredo.startswith(unescape(f.secret)))
+
+
+def _celula_com_marcador(rng: Random, segredo: str) -> dict:
+    """Célula cujo segredo o usuário mandou ignorar — às vezes com a linha partida."""
+    if rng.randrange(2):
+        return {
+            "cell_type": "code",
+            "metadata": {},
+            "outputs": [],
+            "source": [f"exemplo = '{segredo}'  # gitsafety: allow\n"],
+        }
+    return {
+        "cell_type": "code",
+        "metadata": {},
+        "outputs": [],
+        "source": [f"exemplo = '{segredo}'", "  # gitsafety: allow\n"],
+    }
+
+
+def _notebook_com_supressao(semente: int) -> tuple[str, str]:
+    """Devolve `(bruto, segredo_vivo)` — o segredo que NÃO foi suprimido."""
+    rng = Random(semente)
+    suprimido = rng.choice(SEGREDOS)
+    vivo = rng.choice([s for s in SEGREDOS if s != suprimido])
+
+    celulas: list[object] = [_celula_com_marcador(rng, suprimido)]
+    if rng.randrange(2):
+        celulas.append({"cell_type": "code", "metadata": {}, "outputs": [], "source": [ISCA]})
+    celulas.append(
+        {"cell_type": "code", "metadata": {}, "outputs": [], "source": [f"real = '{vivo}'\n"]}
+    )
+    rng.shuffle(celulas)
+
+    documento = {"cells": celulas, "metadata": {}, "nbformat": 4, "nbformat_minor": 5}
+    return json.dumps(documento, indent=rng.choice([1, None])), vivo
+
+
+@pytest.mark.parametrize("semente", range(300))
+def test_suppression_never_silences_an_unsuppressed_secret(semente, tmp_path):
+    """Um `allow` numa célula não pode calar um segredo em outra."""
+    bruto, vivo = _notebook_com_supressao(semente)
+    alvo = tmp_path / "a.ipynb"
+    alvo.write_text(bruto, encoding="utf-8")
+
+    achados = scan_path(alvo).findings
+    assert _quantos(achados, vivo), f"semente {semente}: o segredo vivo sumiu\n{bruto}"
+
+
+@pytest.mark.parametrize("semente", range(300))
+def test_suppression_is_honoured_and_does_not_duplicate(semente, tmp_path):
+    """O segredo suprimido não aparece, e o vivo aparece uma vez só."""
+    bruto, vivo = _notebook_com_supressao(semente)
+    alvo = tmp_path / "a.ipynb"
+    alvo.write_text(bruto, encoding="utf-8")
+
+    achados = scan_path(alvo).findings
+    quantos = _quantos(achados, vivo)
+    assert quantos == 1, (
+        f"semente {semente}: o vivo apareceu {quantos}×; "
+        f"achados={[unescape(f.secret) for f in achados]}\n{bruto}"
+    )

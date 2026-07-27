@@ -273,21 +273,11 @@ def unescape(secret: str) -> str:
         return secret
 
 
-def occurrences_per_line(secret: str, lines: list[str]) -> dict[int, int]:
-    """Quantas vezes este segredo aparece em cada linha do arquivo BRUTO — 1-based.
+def written_forms(secret: str) -> set[str]:
+    """As grafias com que este valor pode aparecer no arquivo bruto.
 
-    Contagem, e não apenas presença, porque é ela que permite dizer *qual* ocorrência é
-    qual. Saber só "este valor aparece nas linhas 8 e 22" não distingue a ocorrência da
-    célula 1 da ocorrência do SVG — e foi confundir as duas que fez um `allow` na primeira
-    apagar a segunda.
-
-    As duas grafias são contadas: o arquivo bruto pode escrever `ã` como `\\u00e3` e uma
-    barra invertida como `\\\\`, e a mesma ocorrência tem grafia diferente nas duas visões.
+    A mesma ocorrência tem grafia diferente nas duas visões: o arquivo escreve `ã` como
+    `\\u00e3` e uma barra invertida como `\\\\`, o documento parseado traz o caractere.
+    Comparar sem considerar as duas trata uma ocorrência como duas coisas distintas.
     """
-    grafias = {secret, json.dumps(secret)[1:-1]}
-    contagem: dict[int, int] = {}
-    for numero, linha in enumerate(lines, start=1):
-        total = max(linha.count(grafia) for grafia in grafias)
-        if total:
-            contagem[numero] = total
-    return contagem
+    return {secret, json.dumps(secret)[1:-1]}
