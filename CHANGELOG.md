@@ -20,6 +20,10 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
   Cada um desses já foi caminho de vazamento real (#M4)
 - Segredo nos metadados do notebook é localizado como `metadados do notebook`; anexos e
   metadados de célula apontam a célula a que pertencem (#M4)
+- Saídas em SVG são verificadas — SVG é texto, e um gráfico gerado com um rótulo indevido
+  pode carregar a credencial (#M4)
+- Segredo usado como **nome de campo** (e não como valor) é encontrado — por exemplo uma
+  chave de API virando rótulo em metadados de célula (#M4)
 
 ### Changed
 
@@ -38,6 +42,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
   valor exibido é o que está de fato no arquivo (#M4)
 - Um `.ipynb` corrompido de forma extrema não interrompe mais a varredura dos demais
   arquivos do diretório (#M4)
+- Um `# gitsafety: allow` em uma célula não silencia mais, por engano, um segredo
+  **diferente** em outro ponto do mesmo notebook (#M4)
+- Segredo contendo barra invertida não é mais reportado duas vezes (#M4)
 
 ### Deprecated
 

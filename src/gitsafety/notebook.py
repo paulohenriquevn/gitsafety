@@ -35,10 +35,22 @@ _CODE_KEYS = ("source", "input")
 #: inseriria quebra onde não há, mantendo o falso negativo do valor partido.
 _LINE_ARRAY_KEYS = frozenset({"traceback"})
 
-#: Mime-types pulados. Base64 de imagem não é segredo — nossos 53 padrões são ancorados em
-#: marcadores literais (`AKIA`, `ghp_`, `postgresql://`), que não ocorrem em base64 — e um
-#: PNG embutido é a maior parte dos bytes de um notebook de análise.
+#: Mime-types pulados: imagem **rasterizada**. Base64 de PNG não é segredo — nossos 53
+#: padrões são ancorados em marcadores literais (`AKIA`, `ghp_`, `postgresql://`), que não
+#: ocorrem em base64 — e um PNG embutido é a maior parte dos bytes de um notebook.
+#:
+#: `+xml` escapa da exclusão porque SVG **é texto**: `image/svg+xml` carrega o conteúdo
+#: legível, e pulá-lo era uma lacuna de cobertura disfarçada de otimização.
 _SKIPPED_MIME_PREFIX = "image/"
+_TEXTUAL_MIME_MARKER = "+xml"
+
+
+def _is_skipped_mime(chave: object) -> bool:
+    return (
+        isinstance(chave, str)
+        and chave.startswith(_SKIPPED_MIME_PREFIX)
+        and _TEXTUAL_MIME_MARKER not in chave
+    )
 
 CODE_ORIGIN = "código"
 OUTPUT_ORIGIN = "saída"
@@ -99,14 +111,6 @@ def _as_text(valor: object, sep: str = "") -> str:
     return ""
 
 
-def _dig(dados: object, caminho: tuple[str, ...]) -> object:
-    for chave in caminho:
-        if not isinstance(dados, dict):
-            return None
-        dados = dados.get(chave)
-    return dados
-
-
 def _collect(
     node: object,
     cell_index: int,
@@ -146,7 +150,21 @@ def _collect(
 
     if isinstance(node, dict):
         for chave, valor in node.items():
-            if isinstance(chave, str) and chave.startswith(_SKIPPED_MIME_PREFIX):
+            if _is_skipped_mime(chave):
+                continue
+            if isinstance(valor, str) and isinstance(chave, str):
+                # Emite `chave: valor` junto, não o valor sozinho. No arquivo bruto os dois
+                # aparecem na mesma linha (`"aws_secret_key": "wJalr..."`), e as regras da
+                # família keyword_assignment precisam do par — o nome é o que identifica um
+                # segredo que não tem prefixo próprio. Separá-los perderia esses achados, e
+                # é o que sobrava para a varredura de texto compensar.
+                #
+                # De quebra cobre o segredo usado como CHAVE, que a recursão sobre valores
+                # nunca alcançaria.
+                if valor:
+                    out.append(Segment(f"{chave}: {valor}", cell_index, origin, ordinal))
+                else:
+                    out.append(Segment(chave, cell_index, origin, ordinal))
                 continue
             _collect(valor, cell_index, origin, ordinal, out, chave)
 
@@ -239,19 +257,3 @@ def parse_notebook(raw: str) -> list[Segment] | None:
         _collect(valor, 0, rotulo, 0, segmentos, chave)
 
     return segmentos
-
-
-def unescape(secret: str) -> str:
-    """Devolve o valor como ele existe no documento, não como o JSON o grafou.
-
-    `json.dumps` grava `ã` como `\\u00e3` por padrão, então a varredura do arquivo bruto vê
-    uma string e a do notebook parseado vê outra — a MESMA ocorrência com duas grafias. Sem
-    normalizar, a fusão não as reconhece como a mesma coisa e reporta a ocorrência duas
-    vezes, uma delas exibindo um valor que não existe em lugar nenhum do arquivo.
-    """
-    try:
-        return json.loads(f'"{secret}"')
-    except ValueError:
-        # Aspas ou barra soltas no valor: não é um literal JSON válido, então não houve
-        # escape a desfazer.
-        return secret

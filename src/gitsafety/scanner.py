@@ -7,7 +7,6 @@ interface (`rules/architecture.md § 1`).
 
 from __future__ import annotations
 
-from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,7 +14,7 @@ from re import Pattern
 from typing import TYPE_CHECKING
 
 from gitsafety.finding import Finding
-from gitsafety.notebook import is_notebook, parse_notebook, unescape
+from gitsafety.notebook import is_notebook, parse_notebook
 from gitsafety.rules import BUILTIN_RULES, Rule
 from gitsafety.walker import SkippedFile, walk
 
@@ -109,7 +108,7 @@ def _scan_notebook(
     path: Path,
     rules: Sequence[Rule],
     allow: Sequence[Pattern[str]] = (),
-) -> tuple[list[Finding], set[tuple[str, str]]] | None:
+) -> list[Finding] | None:
     """Varre um notebook parseado. Devolve `None` para sinalizar degradação (ADR D4).
 
     A localização — célula e linha **dentro** da célula — é codificada no `path` do
@@ -117,24 +116,21 @@ def _scan_notebook(
     milestone aditivo: `cli.render` só imprime `f.path` e não precisa saber de notebooks,
     e os quatro milestones que consomem `Finding` seguem intocados.
 
-    Devolve também o que foi **deliberadamente suprimido**. Sem isso, um
-    `# gitsafety: allow` numa linha que o Jupyter partiu em dois elementos era desfeito
-    pela fusão: o parser juntava, via o marcador e suprimia; a varredura de texto via o
-    segredo numa linha do JSON onde o marcador não estava, e o reintroduzia. A supressão
-    pedida pelo usuário não pode depender de onde o Jupyter escolheu quebrar a linha.
+    A supressão é decidida **aqui e só aqui**. Enquanto existiam dois caminhos varrendo o
+    mesmo arquivo, ela era decidida duas vezes de forma independente, e uma supressão de um
+    lado apagava uma ocorrência não relacionada do outro — silêncio total num segredo real.
+    Uma decisão por ocorrência é o que impede isso, e ela só é possível com um caminho só.
     """
     segmentos = parse_notebook(raw)
     if segmentos is None:
         return None
 
     findings: list[Finding] = []
-    suprimidos: set[tuple[str, str]] = set()
     for segmento in segmentos:
         for numero, linha in enumerate(segmento.text.splitlines(), start=1):
             for rule in rules:
                 for match in rule.pattern.finditer(linha):
                     if is_allowed(match.group(0), linha, allow):
-                        suprimidos.add((rule.id, match.group(0)))
                         continue
                     findings.append(
                         Finding(
@@ -144,59 +140,7 @@ def _scan_notebook(
                             secret=match.group(0),
                         )
                     )
-    return findings, suprimidos
-
-
-def _merge_notebook(
-    do_notebook: tuple[list[Finding], set[tuple[str, str]]] | None,
-    do_texto: list[Finding],
-) -> list[Finding]:
-    """Combina os dois caminhos de modo que o parsing **nunca** cubra menos que o texto.
-
-    O parsing existe para localizar melhor — dizer "célula 4 (saída)" em vez de "linha 50",
-    que não existe quando o notebook é aberto no Jupyter. Ele NÃO existe para decidir o que
-    é varrido.
-
-    A distinção importa porque a extração é necessariamente uma lista: `source`, `input`, e
-    os tipos de saída que conhecemos. Toda lista de formatos conhecidos é uma lista
-    desatualizada — `text/html`, `application/json`, `attachments`, `metadata` do papermill,
-    um `output_type` que o Jupyter ainda vai inventar. Enumerar o que cobrir transforma cada
-    lacuna de memória em falso negativo silencioso, que é a única falha inaceitável neste
-    produto.
-
-    Então o texto é sempre varrido, e o parseado só **enriquece**: cada achado do texto é
-    consumido por um achado localizado equivalente, e o que sobra entra com a localização
-    bruta. Pior localização é infinitamente melhor que silêncio.
-
-    A contagem é por **ocorrência**, não por conjunto: o mesmo segredo em duas células são
-    dois achados, e colapsá-los esconderia um dos lugares de onde ele precisa ser removido.
-    Por isso o parser percorre o documento inteiro — se ele enxergasse menos lugares que a
-    varredura de texto, uma ocorrência que só ele vê (valor partido) consumiria uma
-    ocorrência que só o texto vê, e a segunda desapareceria do relatório.
-
-    A comparação é sobre o valor **desescapado**: o arquivo bruto e o documento parseado
-    grafam o mesmo segredo de formas diferentes quando há não-ASCII.
-    """
-    if do_notebook is None:
-        # JSON não parseou. O texto já foi varrido — degradação para o comportamento dos
-        # milestones anteriores, que é um estado conhecido (ADR D4).
-        return do_texto
-
-    localizados, suprimidos = do_notebook
-    cobertos = Counter((f.rule_id, unescape(f.secret)) for f in localizados)
-    suprimidos = {(rid, unescape(s)) for rid, s in suprimidos}
-
-    extras = []
-    for finding in do_texto:
-        chave = (finding.rule_id, unescape(finding.secret))
-        if chave in suprimidos:
-            continue
-        if cobertos[chave]:
-            cobertos[chave] -= 1
-        else:
-            extras.append(finding)
-
-    return localizados + extras
+    return findings
 
 
 def scan_path(
@@ -220,12 +164,13 @@ def scan_path(
     findings: list[Finding] = []
     for path in files:
         bruto = _read_text(path)
-        do_texto = _scan_text(bruto, path, regras, cfg.allow)
         if is_notebook(path):
-            findings.extend(
-                _merge_notebook(_scan_notebook(bruto, path, regras, cfg.allow), do_texto)
-            )
-        else:
-            findings.extend(do_texto)
+            do_notebook = _scan_notebook(bruto, path, regras, cfg.allow)
+            if do_notebook is not None:
+                findings.extend(do_notebook)
+                continue
+            # `None` = JSON não parseou. Cai para texto, que é o comportamento dos
+            # milestones anteriores — degradação para estado conhecido (ADR D4).
+        findings.extend(_scan_text(bruto, path, regras, cfg.allow))
 
     return ScanResult(findings=findings, skipped=skipped)
