@@ -14,6 +14,7 @@ from re import Pattern
 from typing import TYPE_CHECKING
 
 from gitsafety.finding import Finding
+from gitsafety.notebook import is_notebook, parse_notebook
 from gitsafety.rules import BUILTIN_RULES, Rule
 from gitsafety.walker import SkippedFile, walk
 
@@ -102,6 +103,41 @@ def _scan_text(
     return findings
 
 
+def _scan_notebook(
+    raw: str,
+    path: Path,
+    rules: Sequence[Rule],
+    allow: Sequence[Pattern[str]] = (),
+) -> list[Finding] | None:
+    """Varre um notebook parseado. Devolve `None` para sinalizar degradação (ADR D4).
+
+    A localização — célula e linha **dentro** da célula — é codificada no `path` do
+    `Finding`. Codificar ali, em vez de acrescentar campo à dataclass, é o que mantém o
+    milestone aditivo: `cli.render` só imprime `f.path` e não precisa saber de notebooks,
+    e os quatro milestones que consomem `Finding` seguem intocados.
+    """
+    segmentos = parse_notebook(raw)
+    if segmentos is None:
+        return None
+
+    findings: list[Finding] = []
+    for segmento in segmentos:
+        for numero, linha in enumerate(segmento.text.splitlines(), start=1):
+            for rule in rules:
+                for match in rule.pattern.finditer(linha):
+                    if is_allowed(match.group(0), linha, allow):
+                        continue
+                    findings.append(
+                        Finding(
+                            rule_id=rule.id,
+                            path=Path(segmento.locate(path)),
+                            line=numero,
+                            secret=match.group(0),
+                        )
+                    )
+    return findings
+
+
 def scan_path(
     root: Path,
     rules: Sequence[Rule] = BUILTIN_RULES,
@@ -122,6 +158,14 @@ def scan_path(
 
     findings: list[Finding] = []
     for path in files:
-        findings.extend(_scan_text(_read_text(path), path, regras, cfg.allow))
+        bruto = _read_text(path)
+        if is_notebook(path):
+            do_notebook = _scan_notebook(bruto, path, regras, cfg.allow)
+            if do_notebook is not None:
+                findings.extend(do_notebook)
+                continue
+            # `None` = JSON não parseou: cai para texto, que é o comportamento dos
+            # milestones anteriores. Degradação para estado conhecido (ADR D4).
+        findings.extend(_scan_text(bruto, path, regras, cfg.allow))
 
     return ScanResult(findings=findings, skipped=skipped)
