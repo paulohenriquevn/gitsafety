@@ -62,7 +62,7 @@ lembra que está lá. Ferramenta que não é adotada tem taxa de detecção zero
 
 | Categoria | Restrição |
 |---|---|
-| Stack | Python 3.9+. Dependência externa: **apenas** o parser de YAML. |
+| Stack | Python 3.10+ (elevado de 3.9 no M0 — ADR D8: 3.9 EOL desde 2025-10-31 e impedia pytest sem CVE). Dependência externa: **apenas** o parser de YAML. |
 | Legal | Implementação própria sob MIT. Peers em `knowledge-base/references/` são **study-only** — nenhum código copiado. |
 | Prazo | Nenhum prazo externo. |
 | Time | Um desenvolvedor. Isso é o que impõe o teto de escopo, mais que qualquer outra restrição. |
@@ -91,20 +91,20 @@ a ferramenta é tolerável; ferramenta desinstalada detecta zero.
 > mesmo com poucos padrões, e cada milestone seguinte aumenta cobertura sobre uma base
 > que já funciona.
 
-### M0 — [ ] Esqueleto ponta a ponta
+### M0 — [x] Esqueleto ponta a ponta
 
 **Objetivo:** uma CLI instalável que detecta um padrão real em um arquivo e sai com o
 exit code correto.
 
 **Definition of done (tudo precisa valer):**
 
-- [ ] `pip install -e .` expõe o comando `gitsafety` no PATH.
-- [ ] `gitsafety scan <caminho>` percorre arquivos de texto, aplica **um** padrão real
+- [x] `pip install -e .` expõe o comando `gitsafety` no PATH.
+- [x] `gitsafety scan <caminho>` percorre arquivos de texto, aplica **um** padrão real
       (AWS: `AKIA[0-9A-Z]{16}`) e imprime `arquivo:linha  regra`.
-- [ ] Exit code 0 sem finding, 1 com finding, 2 em erro (caminho inexistente) — cada um
+- [x] Exit code 0 sem finding, 1 com finding, 2 em erro (caminho inexistente) — cada um
       coberto por teste.
-- [ ] Suíte de testes roda com um comando e está verde no CI do próprio repositório.
-- [ ] Binários e arquivos acima de 1 MB são pulados (PRD FR-10).
+- [x] Suíte de testes roda com um comando e está verde no CI do próprio repositório.
+- [x] Binários e arquivos acima de 1 MB são pulados (PRD FR-10).
 
 **Dependências:** nenhuma (é a fundação).
 
