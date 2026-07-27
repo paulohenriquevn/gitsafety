@@ -112,6 +112,20 @@ class CommandNotOnPathError(UsageError):
         self.command = command
 
 
+class GitCommandError(UsageError):
+    """Um comando do git falhou por uma razão que não é defeito nosso.
+
+    Existe para separar duas coisas que o `RuntimeError` confundia: um bug do gitsafety,
+    que deve subir com traceback para ser corrigido, e uma condição operacional do
+    ambiente — git antigo sem a flag que usamos, repositório corrompido, timeout num
+    histórico enorme. A segunda é esperada, e quem a encontra precisa de uma mensagem que
+    diga o que fazer, não de um stack trace (`rules/error-handling.md § 2`).
+    """
+
+    def __init__(self, comando: str, detalhe: str) -> None:
+        super().__init__(f"o git falhou ao executar `{comando}`: {detalhe}")
+
+
 class ConfigError(UsageError):
     """`.gitsafety.yml` inválido, ou padrão de usuário recusado.
 

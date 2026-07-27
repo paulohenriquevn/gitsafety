@@ -236,3 +236,67 @@ def test_ignore_glob_from_config_applies_to_history(repo):
     achados = scan_history(repo.path, config=cfg)
 
     assert [h.finding.rule_id for h in achados] == ["github-personal-access-token"]
+
+
+# --- O invariante que a fixture ASCII não conseguia quebrar ---------------------
+#
+# `test_same_matcher_as_file_scan` afirma `scan_path ⊆ scan_history`, mas com conteúdo
+# ASCII limpo — que nunca dispara as classes de entrada abaixo. Cada uma delas fazia o
+# histórico **e o hook** ficarem cegos ao mesmo tempo, e a suíte inteira passava verde.
+#
+# As três primeiras são configuráveis pelo PRÓPRIO repositório: qualquer um que consiga
+# commitar um `.gitattributes` desliga a verificação de um caminho.
+
+
+def _scan_both(repo) -> tuple[set, set]:
+    da_arvore = {f.secret for f in scan_path(repo.path).findings}
+    do_historico = {h.finding.secret for h in scan_history(repo.path)}
+    return da_arvore, do_historico
+
+
+def test_gitattributes_minus_diff_does_not_hide_the_secret(repo):
+    """`*.env -diff` faz o git emitir `Binary files differ` em vez do conteúdo."""
+    (repo.path / ".gitattributes").write_text("*.env -diff\n", encoding="utf-8")
+    repo.git("add", "-A")
+    repo.git("commit", "-q", "--no-verify", "-m", "attrs")
+    repo.commit("prod.env", f"AWS_KEY={AKIA}\n", "credencial")
+
+    da_arvore, do_historico = _scan_both(repo)
+    assert da_arvore <= do_historico, da_arvore - do_historico
+
+
+def test_textconv_driver_does_not_hide_the_secret(repo):
+    """Um driver `textconv` reescreve o que o diff mostra — e pode redigir a credencial."""
+    (repo.path / ".gitattributes").write_text("*.env diff=redact\n", encoding="utf-8")
+    repo.git("config", "diff.redact.textconv", "sed s/AKIA[A-Z0-9]*/REDACTED/g")
+    repo.git("add", "-A")
+    repo.git("commit", "-q", "--no-verify", "-m", "attrs")
+    repo.commit("prod.env", f"AWS_KEY={AKIA}\n", "credencial")
+
+    da_arvore, do_historico = _scan_both(repo)
+    assert da_arvore <= do_historico, da_arvore - do_historico
+
+
+def test_nul_byte_does_not_hide_the_secret(repo):
+    """A heurística de binário do git dispara com um NUL — comum em dump e UTF-16."""
+    (repo.path / "w.txt").write_bytes(f"AWS_KEY={AKIA}\n\x00t\n".encode())
+    repo.git("add", "-A")
+    repo.git("commit", "-q", "--no-verify", "-m", "nul")
+
+    da_arvore, do_historico = _scan_both(repo)
+    assert da_arvore <= do_historico, da_arvore - do_historico
+
+
+def test_latin1_file_does_not_abort_the_whole_scan(repo):
+    """Um arquivo que não decodifica em UTF-8 não pode derrubar a varredura dos demais.
+
+    `scanner._read_text` já usa `errors="replace"` desde o M0 e documenta o motivo; a
+    defesa não tinha sido levada para a fronteira do git.
+    """
+    (repo.path / "latin.txt").write_bytes("configuração=café\n".encode("latin-1"))
+    (repo.path / "ok.env").write_text(f"AWS_KEY={AKIA}\n", encoding="utf-8")
+    repo.git("add", "-A")
+    repo.git("commit", "-q", "--no-verify", "-m", "latin")
+
+    achados = scan_history(repo.path)
+    assert [h.finding.secret for h in achados] == [AKIA]

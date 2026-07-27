@@ -19,6 +19,16 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
   quando ele foi reintroduzido depois de ter saído (#M5)
 - `ignore:` do `.gitsafety.yml` vale também no histórico (#M5)
 
+### Fixed
+
+- **Um `.gitattributes` no repositório não desliga mais a verificação.** Marcar um arquivo
+  como `-diff`, usar um driver `textconv` ou ter um byte NUL fazia o hook **deixar passar**
+  o commit da credencial, e o `--history` reportar "nenhum segredo encontrado" (#M5)
+- Um arquivo que não decodifica em UTF-8 (latin-1, por exemplo) não interrompe mais a
+  verificação do histórico — antes derrubava o comando inteiro com um erro técnico (#M5)
+- Falha do git — versão antiga sem o recurso que usamos, repositório corrompido, ou tempo
+  limite excedido — vira mensagem explicando o que houve, em vez de um erro técnico (#M5)
+
 ### Changed
 
 ### Deprecated

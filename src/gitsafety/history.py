@@ -88,8 +88,9 @@ def history_diff(cwd: Path) -> str:
       um segredo colado na resolução de um conflito é **invisível** (medido: 0 de 1). Com
       `-m` também apareceria, mas uma vez por pai, dobrando o achado.
     - `-p` com `-U0` — só as linhas adicionadas, sem contexto. Mesma escolha do `staged.py`.
-    - `--no-ext-diff` — um `diff.external` configurado pelo usuário mudaria o formato que
-      parseamos. Mesma defesa que o M1 já aplica ao index.
+    - `--no-ext-diff`, `--text` e `--no-textconv` — as três formas de o próprio repositório
+      desligar a verificação. Ver o comentário no corpo: um `.gitattributes` com `-diff`
+      fazia o hook deixar passar o commit da credencial.
     """
     return run_git(
         [
@@ -99,6 +100,19 @@ def history_diff(cwd: Path) -> str:
             "--all",
             "--diff-merges=first-parent",
             "--no-ext-diff",
+            # `--text` e `--no-textconv` fecham três formas de o PRÓPRIO repositório
+            # desligar a verificação, todas medidas:
+            #
+            # - `.gitattributes` com `-diff` faz o git emitir `Binary files differ` em vez
+            #   do conteúdo. Com o hook instalado, o commit da credencial PASSAVA.
+            # - Um byte NUL no arquivo dispara a mesma heurística de binário — acontece em
+            #   dump, keystore e arquivo em UTF-16.
+            # - Um driver `textconv` reescreve o que o diff mostra, e pode redigir o valor.
+            #
+            # `--no-ext-diff` sozinho era meia defesa: fechava o `diff.external` e deixava
+            # os outros dois abertos, configuráveis do mesmo jeito e por quem commita.
+            "--text",
+            "--no-textconv",
             f"--format={_FORMATO}",
         ],
         cwd=cwd,

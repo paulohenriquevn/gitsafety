@@ -82,3 +82,34 @@ seja, ganho zero. Fazer direito é escopo de outro milestone.
 **Quando revisitar:** se o dogfooding mostrar que alguém deixa de rodar o comando por causa
 do tempo. O caminho provável é um pré-filtro de marcadores literais (`AKIA`, `ghp_`,
 `postgresql://`) construído a partir do catálogo, medido contra o corpus real.
+
+## B4 — `scan --history` não alcança commit reescrito (reflog)
+
+**Origem:** medido na descoberta do M5 (Q5) e cobrado no review — o plano listou como
+Risco nº 4 com a mitigação "declarado no blueprint e no backlog", e o registro no backlog
+não tinha sido feito. Esta entrada fecha essa dívida.
+
+**Medido:**
+
+```
+git commit -m oops              # com a credencial
+git reset --soft HEAD~1 && git restore --staged leak.env && rm leak.env
+gitsafety scan --history        # → Nenhum segredo encontrado
+git log --all --reflog -p -U0 | grep -c AKIA   # → 1
+```
+
+**Por que:** `--all` percorre as referências (branches, tags, stash), e o reflog não é uma
+referência — é o registro local de para onde `HEAD` já apontou. O commit reescrito sai das
+refs mas o objeto sobrevive nele por ~90 dias.
+
+**Por que não foi fechado no M5:** `--reflog` é uma flag só, mas muda o significado do
+comando. O reflog é **local e pessoal** — ele contém o que *você* fez na sua máquina, não o
+que está no repositório compartilhado. Um achado vindo dali diz "esta chave passou pelo seu
+disco", não "esta chave está no histórico do projeto", e misturar as duas afirmações num
+relatório só é pior que não ter a segunda.
+
+**Mitigação entregue no M5:** o `README.md` § Histórico declara a lacuna e reforça que
+reescrever o histórico não desfaz a exposição — revogar a chave é a única ação que resolve.
+
+**Quando revisitar:** se o uso mostrar que gente conta com o comando para auditar a própria
+máquina. Aí o caminho é uma seção separada no relatório, não misturar com o histórico.

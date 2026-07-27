@@ -66,6 +66,19 @@ def staged_diff(cwd: Path) -> str:
             "--staged",
             "-U0",
             "--no-ext-diff",
+            # `--text` e `--no-textconv` fecham três formas de o PRÓPRIO repositório
+            # desligar a verificação, todas medidas:
+            #
+            # - `.gitattributes` com `-diff` faz o git emitir `Binary files differ` em vez
+            #   do conteúdo. Com o hook instalado, o commit da credencial PASSAVA.
+            # - Um byte NUL no arquivo dispara a mesma heurística de binário — acontece em
+            #   dump, keystore e arquivo em UTF-16.
+            # - Um driver `textconv` reescreve o que o diff mostra, e pode redigir o valor.
+            #
+            # `--no-ext-diff` sozinho era meia defesa: fechava o `diff.external` e deixava
+            # os outros dois abertos, configuráveis do mesmo jeito e por quem commita.
+            "--text",
+            "--no-textconv",
             "--src-prefix=a/",
             "--dst-prefix=b/",
         ],

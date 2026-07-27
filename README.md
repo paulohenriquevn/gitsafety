@@ -136,6 +136,12 @@ O custo é proporcional às linhas do histórico, não aos commits. No próprio 
 gitsafety — 51 commits, 74 mil linhas adicionadas — leva cerca de 6 segundos. É um comando
 para rodar de vez em quando, não a cada commit; para isso existe o hook.
 
+**O que ele não vê.** Se você reescreveu o histórico — `git reset`, `git commit --amend`,
+`rebase` — o commit antigo some das referências, e o `--history` não o alcança. Mas o objeto
+continua no seu repositório local por cerca de 90 dias, recuperável pelo reflog. Reescrever
+o histórico não desfaz a exposição: **revogue a chave no provedor**, que é a única ação que
+resolve.
+
 ---
 
 ## Configuração

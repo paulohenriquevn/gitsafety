@@ -9,6 +9,8 @@ distintos (`rules/error-handling.md § 2`).
 
 from __future__ import annotations
 
+import subprocess
+
 import pytest
 
 from gitsafety.errors import ExitCode, GitUnavailableError, NotAGitRepositoryError
@@ -77,3 +79,38 @@ def test_hooks_dir_respects_core_hookspath(tmp_git_repo):
 def test_every_git_error_carries_the_usage_exit_code(cls):
     # A invariante do ADR D4 do M0 estendida aos erros novos.
     assert cls("contexto").exit_code == ExitCode.USAGE_ERROR
+
+
+# --- M5: falha do git é condição operacional, não defeito nosso -----------------
+
+
+def test_git_command_failure_raises_a_typed_error(tmp_path):
+    """Um comando do git que falha precisa virar erro de domínio, não `RuntimeError`.
+
+    `cli.main` captura apenas `GitsafetyError` — de propósito, para que defeito nosso suba
+    com traceback (`rules/error-handling.md § 5`). Mas git antigo sem `--diff-merges`, ou
+    um repositório corrompido, são condições **esperadas**: viram traceback cru e o usuário
+    não sabe o que fazer com ele.
+    """
+    from gitsafety.errors import ExitCode, GitCommandError
+
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, capture_output=True)
+    with pytest.raises(GitCommandError) as exc:
+        run_git(["log", "--flag-que-nao-existe"], cwd=tmp_path)
+
+    assert exc.value.exit_code == ExitCode.USAGE_ERROR
+    assert "--flag-que-nao-existe" in exc.value.message
+
+
+def test_git_timeout_raises_a_typed_error(tmp_path, monkeypatch):
+    """Timeout em repositório enorme é o Risco M5 nº 1 acontecendo — precisa de mensagem."""
+    from gitsafety.errors import GitCommandError
+
+    def estourar(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd="git", timeout=1)
+
+    monkeypatch.setattr(subprocess, "run", estourar)
+    with pytest.raises(GitCommandError) as exc:
+        run_git(["log"], cwd=tmp_path)
+
+    assert "tempo" in exc.value.message.lower() or "timeout" in exc.value.message.lower()

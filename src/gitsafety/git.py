@@ -16,7 +16,7 @@ import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
-from gitsafety.errors import GitUnavailableError, NotAGitRepositoryError
+from gitsafety.errors import GitCommandError, GitUnavailableError, NotAGitRepositoryError
 
 #: `git` costuma responder em milissegundos; um repositório patológico pode demorar mais.
 #: O teto existe para que um git travado não pendure o commit do usuário indefinidamente.
@@ -37,7 +37,7 @@ def run_git(args: Sequence[str], *, cwd: Path) -> str:
 
     - binário ausente → `GitUnavailableError`
     - fora de repositório → `NotAGitRepositoryError`
-    - qualquer outra falha → `RuntimeError` com o stderr no contexto
+    - qualquer outra falha → `GitCommandError` com o stderr no contexto
 
     Usa `check=False` e inspeciona o `returncode` em vez de `check=True`: queremos
     traduzir para erro de domínio, não repassar `CalledProcessError` ao chamador.
@@ -48,19 +48,29 @@ def run_git(args: Sequence[str], *, cwd: Path) -> str:
             cwd=str(cwd),
             capture_output=True,
             text=True,
+            # `errors="replace"` pelo mesmo motivo que `scanner._read_text` (ADR D2 do M0): um
+            # arquivo que não decodifica em UTF-8 não pode derrubar a varredura dos demais.
+            # Sem isso, um único arquivo em latin-1 no histórico levantava `UnicodeDecodeError`
+            # de dentro do `subprocess` e abortava o comando inteiro — com traceback cru, e sem
+            # reportar os segredos que já haviam sido encontrados nos outros arquivos.
+            errors="replace",
             check=False,
             timeout=_GIT_TIMEOUT_SEC,
         )
     except FileNotFoundError as exc:
         raise GitUnavailableError("o programa 'git' não foi encontrado no PATH") from exc
     except subprocess.TimeoutExpired as exc:
-        raise RuntimeError(f"git excedeu {_GIT_TIMEOUT_SEC}s: git {' '.join(args)}") from exc
+        raise GitCommandError(
+            " ".join(args),
+            f"excedeu o tempo limite de {_GIT_TIMEOUT_SEC}s. Em repositório muito grande, "
+            "o histórico pode levar mais que isso",
+        ) from exc
 
     if result.returncode != 0:
         stderr = result.stderr.strip()
         if any(marker in stderr.lower() for marker in _NOT_A_REPO_MARKERS):
             raise NotAGitRepositoryError(str(cwd))
-        raise RuntimeError(f"git {' '.join(args)} falhou ({result.returncode}): {stderr}")
+        raise GitCommandError(" ".join(args), f"código {result.returncode}: {stderr}")
 
     return result.stdout.strip()
 
