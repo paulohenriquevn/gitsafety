@@ -214,7 +214,7 @@ vazamento.
 
 ---
 
-### M5 — [ ] Histórico (`--history`) — *linha de chegada da V1*
+### M5 — [x] Histórico (`--history`) — *linha de chegada da V1*
 
 **Objetivo:** encontrar a chave que já foi commitada no passado.
 

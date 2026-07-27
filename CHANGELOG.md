@@ -6,6 +6,20 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.6.0] - 2026-07-27
+
+### Added
+
 - **`gitsafety scan --history`** — procura chaves que já foram commitadas e mostra em qual
   commit entraram, por quem e quando. É o comando que responde "e a chave que eu commitei
   mês passado?", que o hook não responde (#M5)
@@ -37,13 +51,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Changed
 
-### Deprecated
-
-### Removed
-
 ### Fixed
-
-### Security
 
 ## [0.5.0] - 2026-07-27
 
