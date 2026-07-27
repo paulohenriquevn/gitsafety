@@ -6,6 +6,20 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.1.0] - 2026-07-27
+
+### Added
+
 - **`gitsafety scan [CAMINHO]`** — varre arquivos e diretórios em busca de chaves de
   acesso da AWS. Imprime `arquivo:linha regra segredo` com o segredo **mascarado por
   padrão**, e sai com `0` (nada encontrado), `1` (segredo encontrado) ou `2` (erro de
@@ -27,6 +41,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
   fazia o scorer levantar `FileNotFoundError` em qualquer projeto que adotasse a skill
   sem promover os próprios thresholds.
 
+
 ### Changed
 
 - **Piso de Python elevado de 3.9 para 3.10.** A auditoria de dependências encontrou
@@ -35,12 +50,14 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
   isso, o Python 3.9 está sem suporte de segurança desde 2025-10-31. Um produto de
   segurança não declara suporte a interpretador que não recebe mais correção.
 
+
 ### Removed
 
 - Escopo herdado da documentação anterior, que descrevia outro produto: configuração
   TOML com herança, allowlists com condição `AND`/`OR`, regras compostas, entropia de
   Shannon, decoding recursivo, scan de archives, relatórios CSV/JUnit/SARIF/template e
   distribuição via Docker. Motivos por item em `docs/PRD.md` § 10.
+
 
 ### Fixed
 
@@ -53,3 +70,4 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
   `skills/discover-plan-confidence/tests/test_thresholds_parsing.py`.
 
 > Referências de issue/PR serão adicionadas quando o tracker do projeto existir.
+
