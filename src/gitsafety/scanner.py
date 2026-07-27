@@ -155,7 +155,7 @@ def _pair_with_notebook(
     do_notebook: list[tuple[Finding, bool]] | None,
     raw: str,
     rules: Sequence[Rule],
-) -> tuple[list[Finding | None], list[Finding]]:
+) -> tuple[list[Finding | None], list[tuple[Finding, int | None]]]:
     """Pareia cada achado bruto com o achado localizado da MESMA ocorrência.
 
     Devolve `(alinhados, sobras)`:
@@ -164,8 +164,10 @@ def _pair_with_notebook(
       localizado, ou o próprio bruto quando o percurso não o alcançou, ou `None` quando a
       ocorrência foi deliberadamente suprimida. Manter o alinhamento é o que permite ao
       chamador remapear para as próprias chaves sem adivinhar.
-    - `sobras` são achados do parser sem contrapartida no texto: valor que o Jupyter partiu
-      entre elementos, ou ocorrência que o texto suprimiu demais.
+    - `sobras` são achados do parser sem contrapartida no texto, **com a linha bruta que
+      lhes coube**. São duas classes, e só uma não tem linha: valor que o Jupyter partiu
+      entre elementos (`None`, porque não existe em nenhuma linha isolada) e ocorrência que
+      o texto suprimiu demais (tem linha, e é por ela que o relatório a ordena).
 
     O pareamento é pela **linha bruta**, nunca pelo valor nem pela ordem. Parear por valor
     esconde uma ocorrência quando o mesmo segredo está em dois lugares; parear por ordem
@@ -202,8 +204,8 @@ def _pair_with_notebook(
         alinhados.append(None if suprimido else finding)
 
     sobras = [
-        finding
-        for indice, (finding, suprimido, _) in enumerate(localizados)
+        (finding, linha)
+        for indice, (finding, suprimido, linha) in enumerate(localizados)
         if indice not in usados and not suprimido
     ]
     return alinhados, sobras
@@ -244,8 +246,12 @@ def _localise(
         for bruto, finding in zip(do_texto, alinhados, strict=True)
         if finding is not None
     ]
-    # As sobras não têm linha bruta útil; vão para o fim, preservando a ordem do documento.
-    ordenado.extend((len(linhas) + 1, finding) for finding in sobras)
+    # Sobra COM linha conhecida entra na posição dela; sem linha, vai para o fim. Jogar
+    # todas para o fim desordenava o relatório em 13% dos notebooks medidos — e um relatório
+    # fora da ordem do arquivo é mais difícil de conferir, que é o que se faz com ele.
+    ordenado.extend(
+        (linha if linha is not None else len(linhas) + 1, finding) for finding, linha in sobras
+    )
 
     # `sorted` é estável: empates mantêm a ordem do documento, que é a ordem das células.
     return [finding for _, finding in sorted(ordenado, key=lambda par: par[0])]

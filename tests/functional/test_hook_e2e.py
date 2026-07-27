@@ -214,7 +214,8 @@ def test_hook_does_not_report_a_preexisting_secret_in_a_notebook(
     partido pelo Jupyter. No hook o texto cobre só as linhas adicionadas — então todo
     segredo preexistente virava sobra e era reportado.
 
-    `incluir_extras=False` desliga esse ramo nos caminhos que veem parte do arquivo.
+    Os caminhos que veem parte do arquivo usam `_pair_with_notebook` direto e descartam
+    as sobras, que é o que restaura o contrato.
     """
     import json
 

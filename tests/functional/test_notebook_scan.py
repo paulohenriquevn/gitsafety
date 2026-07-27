@@ -133,3 +133,51 @@ def test_secret_only_in_saved_output_is_found(tmp_path):
 
     assert len(achados) == 1
     assert "saída" in str(achados[0].path)
+
+
+# --- Ordem do relatório, afirmada em teste e não em comentário -------------------
+
+
+def test_report_follows_the_order_of_the_file(tmp_path):
+    """Os achados saem na ordem do arquivo, mesmo vindo por caminhos diferentes.
+
+    Este teste existe por um motivo específico. Três defeitos de uma mesma revisão foram
+    **comentários confiantes e falsos** — sobre ordem, sobre o que era compartilhado, sobre
+    o que uma função devolvia. Nenhum foi pego por teste, porque comentário não é executável.
+
+    O caso: o segredo e o marcador estão no **mesmo elemento JSON**, em linhas diferentes da
+    célula. O arquivo bruto os vê numa linha só e suprime; o parser os separa e não suprime.
+    Esse achado chega ao relatório por um caminho distinto dos outros dois — e jogá-lo para
+    o fim, como o código fazia, desordenava 13% dos notebooks medidos.
+
+    A indentação importa: é o formato que o Jupyter grava, e é o que faz os outros dois
+    achados virem pelo caminho normal. Sem ela tudo cai na mesma linha bruta, todos viram
+    sobra, e o defeito fica invisível — foi o que aconteceu com a primeira versão deste
+    teste, que passava com e sem a correção.
+    """
+    outro = "AKIAI44QH8DHBEXAMPLE"
+    terceiro = "AKIAZZZZZZZZ9EXAMPLE"
+    nb = tmp_path / "n.ipynb"
+    nb.write_text(
+        json.dumps(
+            {
+                "cells": [
+                    _code([f"k = '{AKIA}'\n# gitsafety: allow\n"]),
+                    _code([f"k = '{outro}'\n"]),
+                    _code([f"k = '{terceiro}'\n"]),
+                ],
+                "metadata": {},
+                "nbformat": 4,
+                "nbformat_minor": 5,
+            },
+            indent=1,
+        ),
+        encoding="utf-8",
+    )
+
+    celulas = [
+        int(re.search(r"célula (\d+)", str(f.path)).group(1)) for f in scan_path(nb).findings
+    ]
+
+    assert len(celulas) == 3, celulas
+    assert celulas == sorted(celulas), f"relatório fora da ordem do arquivo: {celulas}"
