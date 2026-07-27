@@ -24,7 +24,7 @@ que é a função dele. O usuário roda `gitsafety scan` para saber onde está.
 **Quando revisitar:** se o uso mostrar que a mensagem do hook confunde. Antes disso, seria
 otimização especulativa.
 
-## B2 — Nenhuma regra da família `keyword_assignment` no catálogo
+## B2 — RESOLVIDO: família `keyword_assignment` acrescentada ao catálogo
 
 **Origem:** controle do oráculo de cobertura do M4 (2026-07-27), ao montar um vetor que
 acabou sendo vazio.
@@ -130,4 +130,26 @@ Corrigido em `staged.py::_decode_path`. `ignore:` valia para nome ASCII e falhav
 silêncio para nome acentuado — mesma classe do defeito que a validação de integração do M5
 pegou, com o eixo no nome do arquivo em vez de no alvo. Direção da falha era ruído (reportava
 a mais), mas num projeto brasileiro acento em nome de arquivo é o caso comum.
+
+## B5 — RESOLVIDO: teto para binário grande no index, com o pulo reportado
+
+Corrigido ao fechar a issue #5. `staged.py::_binarios_grandes` pula o arquivo que **o git**
+marca como binário (`--numstat` com `-`) e cujo tamanho no index passa de 1 MB — o mesmo
+limite que o `scan` aplica desde o M0 — e reporta o pulo por `ScanResult.skipped`.
+
+Medido: 30 MB de assets mais um segredo em `app.py` caem de **5,67 s para 2,21 s**, com o
+segredo ainda bloqueando o commit e os três assets aparecendo como pulados.
+
+**Duas coisas que valem registro:**
+
+O teto é sobre **binário**, não sobre bytes. Copiar o limite de tamanho do `scan` para o
+hook era a saída óbvia e errada: um `.env` de 2 MB com credencial deixaria de bloquear o
+commit — perda de cobertura no único caminho que não pode perder.
+
+A primeira implementação contava bytes das linhas do diff e **não funcionava**: 5 MB de
+arquivo viram 703 KB depois do diff, e o teto nunca era cruzado. Media a quantidade errada,
+e o teste sintético que eu havia escrito passava — só medir o cenário real revelou.
+
+Medição colateral que corrige a moldura da issue: 5 MB de binário custam 3,17 s e 3 MB de
+texto custam 4,31 s. **O custo é volume, não binariedade.**
 
