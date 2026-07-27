@@ -1,23 +1,14 @@
 """Ponto de entrada do console e de `python -m gitsafety`.
 
-Mantido deliberadamente fino: a única responsabilidade aqui é traduzir o código de
-retorno de `cli.main` em código de saída de processo. Toda a lógica vive em `cli.py`
-(`rules/architecture.md § 1` — a interface roteia, não decide).
+Fino de propósito: a única responsabilidade é aplicar o código que `cli.main`
+devolve. Toda decisão vive em `cli.py` — a interface roteia, não decide
+(`rules/architecture.md § 1`).
 """
 from __future__ import annotations
 
 import sys
 
-from gitsafety import __version__
-
-
-def main(argv: list[str] | None = None) -> int:
-    args = sys.argv[1:] if argv is None else list(argv)
-    if "--version" in args:
-        print(f"gitsafety {__version__}")
-        return 0
-    print(f"gitsafety {__version__}")
-    return 0
+from gitsafety.cli import main
 
 
 if __name__ == "__main__":
