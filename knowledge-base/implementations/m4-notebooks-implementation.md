@@ -48,16 +48,13 @@ gitsafety scan:  analise.ipynb :: célula 2 (código):2   aws-access-key-id
 | Decisão | Alternativa recusada | Por quê |
 |---|---|---|
 | `json` da stdlib | `nbformat` do PyPI | O `NFR-1` autoriza **uma** dependência de runtime, gasta no M3. E a validação de esquema do `nbformat` é o oposto do que queremos: um notebook que ele rejeita ainda pode conter a credencial |
-| `"".join(source)` sem separador | juntar com `\n` | Os elementos já trazem o `\n` quando há quebra; inserir um deslocaria a numeração e manteria o falso negativo do valor partido |
+| Separador por campo: `""` para `source`/`stream.text`, `"\n"` para `traceback` | um separador só | O schema mistura duas convenções: `multiline_string` já traz o `\n` (juntar com um deslocaria a numeração e manteria o falso negativo do valor partido); `traceback` é array de linhas **sem** `\n` (juntar sem um cola o fim de um valor no começo da linha seguinte) |
 | Chaves `source` **e** `input` | só `source` | `input` é o nome no `nbformat` v3 — Risco M4 nº 1, falso negativo silencioso em notebook antigo |
-| Tabela dos 4 `output_type` | só `stream` | `stream` é o do `print`, o mais citado; `execute_result` é o de `os.environ` sozinho numa célula, e `error` guarda o traceback com os valores da chamada que falhou |
+| Tabela dos 4 `output_type` para **localizar**, texto sempre varrido para **cobrir** | tabela como única fonte de cobertura | `stream` é o do `print`, o mais citado; `execute_result` é o de `os.environ` sozinho numa célula; `error` guarda o traceback com os valores. Mas `data` é um mimebundle — qualquer mime — então nenhuma tabela cobre tudo, e a cobertura não pode depender dela (ver § o que o review pegou) |
 | Parse falho → `None` → varre como texto | falhar, ou pular | Pular é o falso negativo silencioso que o ADR D3 do M0 proíbe; falhar recusaria um arquivo que ainda pode ter a chave. Texto é o comportamento dos milestones anteriores — degradação para estado **conhecido** |
 | Localização codificada no `path` do `Finding` | campo novo na dataclass | Mantém o milestone aditivo: `cli.py` não muda e os quatro milestones que consomem `Finding` seguem intocados |
 
 ## Medição (T3.1)
-
-Mesma máquina, medição pareada sobre o **mesmo** notebook, `indent=1` como o Jupyter grava,
-melhor de 3 rodadas. `benchmarks/bench_notebook.py`.
 
 Os dois lados passam por `scan_path`, variando só a extensão (`.ipynb` vs `.txt`) — mesma
 travessia, mesma leitura, mesmas 53 regras. `indent=1` como o Jupyter grava, melhor de 3
