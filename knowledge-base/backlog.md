@@ -172,3 +172,22 @@ e o teste sintético que eu havia escrito passava — só medir o cenário real 
 Medição colateral que corrige a moldura da issue: 5 MB de binário custam 3,17 s e 3 MB de
 texto custam 4,31 s. **O custo é volume, não binariedade.**
 
+
+## B6 — Instalado num venv, o hook falha em todo commit fora dele
+
+**Origem:** dogfooding do próprio repositório (issue #3), minutos depois de instalar.
+
+**O que acontece:** `sh: gitsafety: not found`, exit 127, commit bloqueado. O `install`
+verifica o PATH **no momento da instalação**; nada verifica no momento do commit, e o
+ambiente de quem commita não é necessariamente o de quem instalou.
+
+**Direção da falha:** fechada, que é a decisão certa para uma ferramenta de segurança. Mas
+a mensagem que o usuário vê é do `sh`, não nossa, e não diz o que fazer. Quem instala numa
+sexta e volta na segunda com o venv desativado vai achar que a ferramenta quebrou.
+
+**Mitigação entregue:** o `README.md` § Instalação passou a recomendar `pipx` explicitamente
+e a explicar a consequência de usar venv.
+
+**Caminho se for fechado:** o hook gravado poderia detectar a ausência e imprimir uma
+mensagem nossa antes de falhar — mas isso significa lógica no arquivo de hook, que hoje tem
+duas linhas de propósito. Precisa de medição do trade antes de crescer.

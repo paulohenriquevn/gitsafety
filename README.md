@@ -22,6 +22,11 @@ pip install gitsafety      # dentro de um venv ou de um ambiente de notebook
 
 Sem Docker, sem compilar nada, sem serviço para subir.
 
+> **Prefira o `pipx`.** O hook chama `gitsafety` pelo PATH na hora do commit, e um venv que
+> você esqueceu de ativar faz **todo commit falhar** com `gitsafety: not found`. O `pipx`
+> deixa o comando disponível sempre. Se instalar num venv, lembre que quem commita precisa
+> estar nele — descobrimos isso instalando no nosso próprio repositório.
+
 ---
 
 ## Uso
