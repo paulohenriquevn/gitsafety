@@ -177,3 +177,51 @@ concordar com a gente sobre o que é binário.
 repositório controla. Decidir por CONTEÚDO (`git cat-file blob`, procurar NUL nos primeiros
 8 KB) é o caminho — com o custo medido antes, porque é mais um processo por arquivo.
 
+
+## B7 — Localização de notebook é quadrática no número de segredos distintos
+
+**Origem:** review das correções das issues (2026-07-27).
+
+**Medido** (notebook único, N segredos distintos, no caminho `--staged`):
+
+| N | tempo |
+|---|---|
+| 250 | 0,46 s |
+| 500 | 1,46 s |
+| 1000 | 5,41 s |
+
+Cresce ×3,7 a cada dobra. Caso comum não sofre: 50 notebooks com 1 achado cada custam
++43%, cerca de 0,6 s.
+
+**Causa, local e conhecida:** `scanner._rule_matches_per_line` varre todas as linhas brutas
+**uma vez por `(regra, segredo)` distinto**. Memoizar por linha em vez de por segredo
+colapsa para linear sem mudar semântica.
+
+**Por que não foi feito agora:** o custo só aparece com dezenas a centenas de segredos
+distintos num único notebook — e nesse cenário o commit vai ser bloqueado de qualquer forma.
+O usuário paga 3 s para receber a resposta certa. A `NFR-2` fala de commit típico.
+
+**Por que não pode ser esquecido:** a superfície triplicou nesta rodada — a mesma função
+agora roda nos três alvos, e o `--history` percorre todo o histórico.
+
+## B8 — Valor partido entre elementos não é visto pelo hook nem pelo histórico
+
+**Origem:** mesmo review, ao caçar o inverso da correção do M1.
+
+**O que acontece:** um segredo que o Jupyter partiu entre elementos de `source` numa célula
+recém-adicionada é achado pelo `scan` e **não** pelos outros dois alvos.
+
+```
+scan .    -> s.ipynb :: célula 2 (código):1   AKIA...   exit 1
+--staged  -> Nenhum segredo encontrado.                 exit 0
+--history -> Nenhum segredo encontrado.                 exit 0
+```
+
+**Não é regressão** — antes destas correções nenhum dos dois parseava notebook. Mas virou
+**estrutural**: `_pair_with_notebook` descarta as sobras nesses caminhos, porque incluí-las
+faria todo segredo preexistente ser reportado como introduzido agora (o defeito M1).
+
+**Caminho estreito e honesto:** para notebook **recém-criado** o caminho staged vê o arquivo
+inteiro, e ali as sobras são seguras — não existe conteúdo preexistente. Cobre o vazamento
+mais provável, que é adicionar um notebook novo com segredo. Para notebook modificado, a
+lacuna permanece e precisa estar documentada.

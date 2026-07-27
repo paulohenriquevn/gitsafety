@@ -84,7 +84,9 @@ A única regra que olha o **contexto** em vez do valor é a genérica: ela exige
 variável (`password`, `api_key`, `aws_secret_access_key`…), o operador de atribuição, e um
 valor de 20+ caracteres **com dígito e letra**. Isso é o que separa uma credencial de um
 identificador de código — `secret_key = settings.SECRET_KEY` não casa, `token = os.environ[...]`
-não casa. Medido sobre 72.570 linhas de código real: zero falsos positivos.
+não casa. Medido: **zero** falsos positivos em 72.570 linhas de código dos projetos de
+referência, e **3** num corpus maior de 1,3 milhão de linhas — a classe deles está descrita
+logo abaixo.
 
 Ela tem fronteira, e vale saber qual. **Não** pega: valor em outra linha, valor montado por
 concatenação, senha com símbolo nos primeiros 20 caracteres (`"S3nh4@Sup3r..."`), senha só

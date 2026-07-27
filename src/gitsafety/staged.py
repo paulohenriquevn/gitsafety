@@ -195,9 +195,10 @@ def scan_staged_diff(
 ) -> ScanResult:
     """Varre um diff já obtido. Existe separada para ser testável sem repositório.
 
-    `scan_staged` e o caminho do histórico compartilham esta função — o mesmo diff, o mesmo
-    matcher, o mesmo teto. Duplicar aqui garantiria divergência na primeira mudança, e o M4
-    mediu o preço de dois caminhos sobre a mesma coisa.
+    O que `history.py` compartilha daqui é o **parser** (`parse_added_lines`) e o filtro de
+    `ignore:` — não esta função, que é específica do index. Duplicar o parser garantiria
+    divergência na primeira mudança, e o M4 mediu o preço de dois caminhos sobre a mesma
+    coisa.
     """
     from gitsafety.config import Config, effective_rules
 
@@ -272,7 +273,7 @@ def _com_localizacao_de_notebook(
     paga nada.
     """
     from gitsafety.config import effective_rules
-    from gitsafety.scanner import _localise, _scan_notebook
+    from gitsafety.scanner import _pair_with_notebook, _scan_notebook
 
     if not resultado.findings:
         return resultado
@@ -298,14 +299,13 @@ def _com_localizacao_de_notebook(
             # pior mas nunca silêncio.
             localizados.extend(achados)
             continue
-        localizados.extend(
-            _localise(
-                achados,
-                _scan_notebook(bruto, caminho, regras, cfg.allow),
-                bruto,
-                regras,
-                incluir_extras=False,
-            )
+        alinhados, _sobras = _pair_with_notebook(
+            achados, _scan_notebook(bruto, caminho, regras, cfg.allow), bruto, regras
         )
+        # As sobras são descartadas de propósito: este caminho vê só as linhas ADICIONADAS,
+        # então todo segredo preexistente do notebook viraria sobra e seria reportado como
+        # se tivesse sido introduzido agora. `staged.py` declara o contrato oposto — o hook
+        # reclama do que você introduz. `None` é ocorrência suprimida pelo marcador.
+        localizados.extend(f for f in alinhados if f is not None)
 
     return ScanResult(findings=localizados, skipped=resultado.skipped)

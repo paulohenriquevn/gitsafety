@@ -181,9 +181,10 @@ def _localizar_notebooks(
     Custo: uma chamada ao git por notebook **que tenha achado**.
     """
     from gitsafety.notebook import is_notebook
-    from gitsafety.scanner import _localise, _scan_notebook
+    from gitsafety.scanner import _pair_with_notebook, _scan_notebook
 
     resultado = {chave: introducao[chave][0] for chave in ordem}
+    suprimidas: set = set()
 
     por_arquivo: dict[tuple[str, str], list] = {}
     for chave in ordem:
@@ -199,26 +200,22 @@ def _localizar_notebooks(
             # a localização bruta, que é pior mas nunca silêncio.
             continue
         achados = [introducao[c][0] for c in chaves]
-        melhorados = _localise(
-            achados,
-            _scan_notebook(bruto, Path(caminho), regras, allow),
-            bruto,
-            regras,
-            incluir_extras=False,
+        alinhados, _sobras = _pair_with_notebook(
+            achados, _scan_notebook(bruto, Path(caminho), regras, allow), bruto, regras
         )
-        # `incluir_extras=False` porque este caminho vê só as linhas ADICIONADAS de cada
-        # commit, não o arquivo inteiro: com ele ligado, todo segredo preexistente do
-        # notebook viraria "sobra" e seria reportado como se tivesse sido introduzido ali.
-        # Assim a função é enriquecimento puro — melhora a localização, nunca cria achado.
-        #
-        # `_localise` devolve na ordem dos achados de texto, então o pareamento posicional
-        # é seguro.
-        # `strict=False` de propósito: `_localise` pode devolver sobras (valor partido entre
-        # elementos) que não têm chave correspondente. Emparelhar até o menor é o correto.
-        for chave, melhorado in zip(chaves, melhorados, strict=False):
-            resultado[chave] = melhorado
+        # `_pair_with_notebook` devolve UM item por achado de entrada, na ordem de entrada —
+        # é o que permite remapear para as chaves sem adivinhar. O `_localise` ordena por
+        # linha e descarta suprimidos, então parear posicionalmente com ele trocava a
+        # identidade dos achados: a contagem de introduções acabava no segredo errado.
+        for chave, melhorado in zip(chaves, alinhados, strict=True):
+            if melhorado is not None:
+                resultado[chave] = melhorado
+            else:
+                # Ocorrência suprimida por marcador que o Jupyter separou do segredo. O
+                # `--history` passa a honrá-la, como o `scan` e o hook já faziam.
+                suprimidas.add(chave)
 
-    return resultado
+    return resultado, suprimidas
 
 
 def rewritten_commits(cwd: Path) -> int:
@@ -315,7 +312,7 @@ def scan_history(
         for chave in vistos_no_commit:
             entradas[chave] += 1
 
-    localizados = _localizar_notebooks(introducao, ordem, cwd, regras, cfg.allow)
+    localizados, suprimidas = _localizar_notebooks(introducao, ordem, cwd, regras, cfg.allow)
 
     return [
         HistoryFinding(
@@ -324,4 +321,5 @@ def scan_history(
             introductions=entradas[chave],
         )
         for chave in ordem
+        if chave not in suprimidas
     ]

@@ -150,59 +150,36 @@ def _scan_notebook(
     return achados
 
 
-def _localise(
+def _pair_with_notebook(
     do_texto: list[Finding],
     do_notebook: list[tuple[Finding, bool]] | None,
     raw: str,
     rules: Sequence[Rule],
-    *,
-    incluir_extras: bool = True,
-) -> list[Finding]:
-    """Usa o documento parseado para MELHORAR a localização do que o texto já encontrou.
+) -> tuple[list[Finding | None], list[Finding]]:
+    """Pareia cada achado bruto com o achado localizado da MESMA ocorrência.
 
-    A varredura do arquivo bruto é a linha de base e **sempre roda**. Isso é o que torna a
-    cobertura um mecanismo em vez de uma afirmação: qualquer coisa que o percurso do JSON
-    não alcance — um mime que ele pule, um campo de forma inesperada, uma chave duplicada
-    que o `json` descarta — continua sendo reportada, com a linha do JSON em vez da célula.
-    Localização pior, nunca silêncio.
+    Devolve `(alinhados, sobras)`:
 
-    Essa distinção custou três rodadas de revisão para ficar clara. Duas vezes o parser foi
-    promovido a fonte da cobertura — primeiro com uma tabela de campos, depois com um
-    percurso "completo" — e as duas vezes ele deixou passar formas válidas que ninguém tinha
-    listado. A completude do percurso é uma crença; a da varredura de texto é o comportamento
-    que os quatro milestones anteriores já entregavam.
+    - `alinhados` tem **um item por achado de texto, na ordem de entrada** — o achado
+      localizado, ou o próprio bruto quando o percurso não o alcançou, ou `None` quando a
+      ocorrência foi deliberadamente suprimida. Manter o alinhamento é o que permite ao
+      chamador remapear para as próprias chaves sem adivinhar.
+    - `sobras` são achados do parser sem contrapartida no texto: valor que o Jupyter partiu
+      entre elementos, ou ocorrência que o texto suprimiu demais.
 
-    O pareamento é pela **linha bruta**, não pelo valor nem pela ordem. Parear por valor
+    O pareamento é pela **linha bruta**, nunca pelo valor nem pela ordem. Parear por valor
     esconde uma ocorrência quando o mesmo segredo está em dois lugares; parear por ordem
-    quebra quando um dos lados suprimiu algo que o outro não viu. A linha é a identidade
-    real da ocorrência, e `raw_lines_containing` a recupera.
-
-    Um achado do parser que não existe em nenhuma linha isolada é um valor que o Jupyter
-    partiu entre elementos — invisível ao texto por construção. Esse entra como achado
-    **adicional**, e é o caso que originou o milestone.
-
-    `incluir_extras=False` desliga essa adição, e existe para os caminhos que veem só
-    **parte** do arquivo. No `scan`, `do_texto` cobre o arquivo inteiro, então toda sobra é
-    de fato um valor partido. No hook, `do_texto` cobre só as linhas ADICIONADAS — e aí
-    todo segredo preexistente do notebook vira sobra e seria reportado, quebrando o
-    contrato que `staged.py` declara: *o hook reclama do que você introduz, não de segredo
-    que já estava num arquivo que você por acaso tocou*.
-
-    Com ele desligado a função vira enriquecimento puro: melhora a localização de achados
-    que já existem, e nunca cria achado novo.
+    quebra quando um dos lados suprimiu algo que o outro não viu — foi exatamente esse o
+    defeito que o review pegou no `--history`, onde a contagem de introduções acabava
+    atribuída ao segredo errado.
     """
     if do_notebook is None:
-        return do_texto
+        return list(do_texto), []
 
     linhas = raw.splitlines()
     localizados = _assign_raw_lines(do_notebook, linhas, rules)
 
-    # Cada achado carrega a linha bruta a que pertence, para que o relatório saia na ordem
-    # do arquivo. Sem isso, os achados que o texto não produziu eram anexados no fim, e num
-    # notebook minificado — onde tudo cai na linha 1 — as células saíam fora de ordem.
-    # Nenhum achado se perde por isso, mas um relatório desordenado é mais difícil de
-    # conferir, e conferir é o que o usuário faz com ele.
-    ordenado: list[tuple[int, Finding]] = []
+    alinhados: list[Finding | None] = []
     usados: set[int] = set()
     for bruto in do_texto:
         par = next(
@@ -218,28 +195,58 @@ def _localise(
         )
         if par is None:
             # O texto achou algo que o percurso não alcançou. Vale com a localização bruta.
-            ordenado.append((bruto.line, bruto))
+            alinhados.append(bruto)
             continue
         usados.add(par)
         finding, suprimido, _ = localizados[par]
-        if not suprimido:
-            ordenado.append((bruto.line, finding))
+        alinhados.append(None if suprimido else finding)
 
-    # Todo achado do parser que sobrou e não foi suprimido entra por conta própria. São
-    # duas situações, e ambas são achados reais que o texto não produziu:
-    #
-    # - Valor que o Jupyter partiu entre elementos — invisível ao texto por construção. É o
-    #   caso que originou o milestone.
-    # - Ocorrência que o texto suprimiu **demais**: o marcador vale por linha, e um notebook
-    #   gravado sem indentação põe o arquivo inteiro numa linha só, onde um único
-    #   `# gitsafety: allow` calaria todos os segredos do documento. O parser vê a linha da
-    #   célula, que é a que o usuário escreveu, e é a leitura correta.
-    if incluir_extras:
-        ordenado.extend(
-            (linha if linha is not None else len(linhas) + 1, finding)
-            for indice, (finding, suprimido, linha) in enumerate(localizados)
-            if indice not in usados and not suprimido
-        )
+    sobras = [
+        finding
+        for indice, (finding, suprimido, _) in enumerate(localizados)
+        if indice not in usados and not suprimido
+    ]
+    return alinhados, sobras
+
+
+def _localise(
+    do_texto: list[Finding],
+    do_notebook: list[tuple[Finding, bool]] | None,
+    raw: str,
+    rules: Sequence[Rule],
+) -> list[Finding]:
+    """Relatório do `scan`: achados localizados, mais as sobras, na ordem do arquivo.
+
+    A varredura do arquivo bruto é a linha de base e **sempre roda**. Isso é o que torna a
+    cobertura um mecanismo em vez de uma afirmação: qualquer coisa que o percurso do JSON
+    não alcance — um mime que ele pule, um campo de forma inesperada, uma chave duplicada
+    que o `json` descarta — continua sendo reportada, com a linha do JSON em vez da célula.
+    Localização pior, nunca silêncio.
+
+    Essa distinção custou três rodadas de revisão para ficar clara. Duas vezes o parser foi
+    promovido a fonte da cobertura — primeiro com uma tabela de campos, depois com um
+    percurso "completo" — e as duas vezes ele deixou passar formas válidas que ninguém tinha
+    listado. A completude do percurso é uma crença; a da varredura de texto é o comportamento
+    que os milestones anteriores já entregavam.
+
+    As sobras entram aqui porque este caminho vê o arquivo **inteiro**: toda sobra é um valor
+    partido pelo Jupyter, ou uma ocorrência que o texto suprimiu demais. Os caminhos que veem
+    só parte do arquivo usam `_pair_with_notebook` direto e as descartam — ver `staged.py`.
+    """
+    alinhados, sobras = _pair_with_notebook(do_texto, do_notebook, raw, rules)
+
+    if do_notebook is None:
+        return [f for f in alinhados if f is not None]
+
+    linhas = raw.splitlines()
+    ordenado: list[tuple[int, Finding]] = [
+        (bruto.line, finding)
+        for bruto, finding in zip(do_texto, alinhados, strict=True)
+        if finding is not None
+    ]
+    # As sobras não têm linha bruta útil; vão para o fim, preservando a ordem do documento.
+    ordenado.extend((len(linhas) + 1, finding) for finding in sobras)
+
     # `sorted` é estável: empates mantêm a ordem do documento, que é a ordem das células.
     return [finding for _, finding in sorted(ordenado, key=lambda par: par[0])]
 

@@ -361,3 +361,79 @@ def test_history_localises_notebook_by_cell(repo):
 
     assert len(achados) == 1
     assert "célula 2" in str(achados[0].finding.path)
+
+
+def test_history_does_not_swap_findings_between_cells(repo):
+    """Dois segredos no mesmo notebook e commit não podem trocar de identidade.
+
+    O pareamento era posicional — `zip(chaves, melhorados)` — sobre duas premissas falsas:
+    `_localise` devolve ordenado por **linha**, não pela ordem de entrada, e pode devolver
+    **menos** itens que recebeu, porque descarta os suprimidos. O efeito visível era a
+    contagem de introduções aparecer no segredo errado, que é exatamente o campo que o
+    usuário lê para saber que a credencial voltou depois de sair.
+    """
+    import json
+
+    outro = "AKIAI44QH8DHBEXAMPLE"
+
+    def nb(*celulas):
+        return json.dumps(
+            {
+                "cells": [
+                    {"cell_type": "code", "source": [c], "metadata": {}, "outputs": []}
+                    for c in celulas
+                ],
+                "metadata": {},
+                "nbformat": 4,
+            },
+            indent=1,
+        )
+
+    repo.commit("n.ipynb", nb(f"a = '{AKIA}'\n", "x = 1\n", f"b = '{outro}'\n"), "c1")
+    repo.commit("n.ipynb", nb(f"a = '{AKIA}'\n", "x = 1\n", "y = 2\n"), "remove")
+    repo.commit("n.ipynb", nb(f"a = '{AKIA}'\n", "x = 1\n", f"b = '{outro}'\n"), "recoloca")
+
+    por_segredo = {h.finding.secret: h for h in scan_history(repo.path)}
+
+    assert por_segredo[outro].introductions == 2, "quem voltou foi este"
+    assert por_segredo[AKIA].introductions == 1, "este nunca saiu"
+    assert "célula 1" in str(por_segredo[AKIA].finding.path)
+    assert "célula 3" in str(por_segredo[outro].finding.path)
+
+
+def test_history_honours_a_split_allow_marker_without_duplicating(repo):
+    """Supressão no notebook não pode virar achado duplicado no histórico.
+
+    `_localise` descarta o achado suprimido, devolvendo menos itens que recebeu. Com o
+    pareamento posicional, o `strict=False` truncava em silêncio e deslocava o resto — o
+    segredo real aparecia duas vezes, uma delas com a localização crua.
+    """
+    import json
+
+    real = "AKIAI44QH8DHBEXAMPLE"
+    nb = json.dumps(
+        {
+            "cells": [
+                {
+                    "cell_type": "code",
+                    "source": [f"exemplo = '{AKIA}'", "  # gitsafety: allow\n"],
+                    "metadata": {},
+                    "outputs": [],
+                },
+                {
+                    "cell_type": "code",
+                    "source": [f"real = '{real}'\n"],
+                    "metadata": {},
+                    "outputs": [],
+                },
+            ],
+            "metadata": {},
+            "nbformat": 4,
+        },
+        indent=1,
+    )
+    repo.commit("n.ipynb", nb, "com marcador")
+
+    achados = scan_history(repo.path)
+
+    assert [h.finding.secret for h in achados] == [real]
