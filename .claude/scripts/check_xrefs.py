@@ -77,7 +77,7 @@ RULES_REF_RE = re.compile(
 )
 
 
-from ecosystem_utils import find_ecosystem_dir as _find_ecosystem_dir_impl, is_ecosystem_layout as _is_ecosystem_layout  # noqa: E402
+from ecosystem_utils import find_ecosystem_dir as _find_ecosystem_dir_impl  # noqa: E402
 
 
 def _find_ecosystem_dir(start: Path) -> Path | None:

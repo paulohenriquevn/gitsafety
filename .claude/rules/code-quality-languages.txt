@@ -1,21 +1,27 @@
-# Languages enabled for /code-quality and post-edit-check.sh.
+# Linguagens habilitadas para /code-quality e para hooks/post-edit-check.sh.
 #
-# Format: one language identifier per line. Lines starting with '#' are comments.
-# Identifiers match the file extensions handled by hooks/post-edit-check.sh.
+# FORMATO — pipe-delimitado, uma linguagem por linha:
+#   LINGUAGEM | MANIFESTO | STATUS | NOTAS
 #
-# Default policy: empty file = no language-specific quality checks run. Each
-# project enables the languages it actually uses. Adding a language here is a
-# signal to /code-quality and the post-edit hook that the toolchain should be
-# present and consulted.
+# STATUS ∈ {ENABLED, DISABLED, DEFER} (validado em
+# skills/code-quality/scripts/_shared.py:108). Linha com menos de 3 campos aborta o
+# carregamento com "languages.txt malformed line" — não degrada em silêncio.
 #
-# Supported identifiers (uncomment the ones your project uses):
+# O cabeçalho anterior deste arquivo dizia "one language identifier per line", o que
+# contradiz o parser: um `python` solto derruba o gate. Corrigido em 2026-07-27, junto
+# com a habilitação do M0. Formato de referência:
+# skills/code-quality/defaults/languages.txt
 #
-# go
-# python
-# typescript
-# javascript
-# rust
-# java
-# kotlin
-# ruby
-# csharp
+# Linhas iniciadas por '#' e linhas vazias são ignoradas.
+#
+# Política padrão: arquivo sem entrada ENABLED = nenhuma verificação específica de
+# linguagem roda. Cada projeto habilita as que realmente usa — habilitar aqui é o
+# sinal de que a toolchain deve estar presente e ser consultada.
+
+# Habilitado no M0, quando o primeiro código de produto entrou no repositório.
+python | pyproject.toml | ENABLED | Detector de primeira classe; runtime sem dependências.
+
+# Linguagens suportadas e não usadas por este projeto:
+# typescript | package.json | DISABLED | Não usado.
+# rust       | Cargo.toml   | DISABLED | Não usado.
+# go         | go.mod       | DISABLED | Não usado.

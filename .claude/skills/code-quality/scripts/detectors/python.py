@@ -23,6 +23,28 @@ _VULTURE_LINE_RE = re.compile(
 
 _VULTURE_TIMEOUT_SEC = 120
 
+#: Diretórios que nunca contêm código de autoria do projeto sob auditoria.
+#:
+#: Sem esta exclusão, `vulture <repo_root>` varre o virtualenv, dependências vendorizadas
+#: e repositórios clonados para estudo, e devolve `FAIL_HARD` por símbolos de terceiros —
+#: bloqueando `/review` por algo que o time não escreveu e não pode corrigir. Um gate que
+#: reprova por código alheio é pior que gate nenhum: ensina o time a ignorá-lo.
+#:
+#: `code-quality-golden-rule.md § 8` declara que a regra existe para impedir que exports
+#: mortos se acumulem **no código do projeto**. Virtualenv não é código do projeto.
+DEAD_CODE_EXCLUDE_GLOBS: tuple[str, ...] = (
+    "*/.venv/*",
+    "*/venv/*",
+    "*/.tox/*",
+    "*/site-packages/*",
+    "*/node_modules/*",
+    "*/knowledge-base/references/*",
+    "*/build/*",
+    "*/dist/*",
+    "*/.git/*",
+    "*/__pycache__/*",
+)
+
 
 class PythonDetector(BaseDetector):
     language = "python"
@@ -30,6 +52,22 @@ class PythonDetector(BaseDetector):
 
     def __init__(self, min_confidence: int = 80) -> None:
         self.min_confidence = min_confidence
+
+    def build_dead_code_command(self, repo_root: Path) -> list[str]:
+        """Monta a invocação do vulture, com as exclusões de terceiros aplicadas.
+
+        Separada de `detect_dead_code` para que a exclusão seja verificável sem
+        precisar de um repositório de verdade em disco — a asserção que importa é
+        "a exclusão chega ao vulture", não "a intenção estava no código".
+        """
+        return [
+            "vulture",
+            "--min-confidence",
+            str(self.min_confidence),
+            "--exclude",
+            ",".join(DEAD_CODE_EXCLUDE_GLOBS),
+            str(repo_root),
+        ]
 
     def detect_dead_code(self, repo_root: Path) -> list[Finding]:
         """Run vulture against `repo_root` and parse stdout into Findings.
@@ -39,12 +77,7 @@ class PythonDetector(BaseDetector):
             If vulture is unavailable, returns a single SOFT_CAP Finding with
             allowlist_key containing `auditor_unavailable_vulture`.
         """
-        cmd = [
-            "vulture",
-            "--min-confidence",
-            str(self.min_confidence),
-            str(repo_root),
-        ]
+        cmd = self.build_dead_code_command(repo_root)
         try:
             result = subprocess.run(
                 cmd,

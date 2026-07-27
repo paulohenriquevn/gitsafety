@@ -32,3 +32,30 @@
 
 # Example (commented):
 # dead_code_unallowlisted_python | src/legacy/migrator.py:128 | 2026-09-01 | Legacy migration helper retained for v0.9 rollback path; remove after v1.0 release.
+
+
+# --- FORMATO REAL (verificado em _shared.py:178-199) ----------------------------
+#
+# O cabeçalho acima e `code-quality-golden-rule.md § 4` documentam 4 campos
+# (IDENTIFIER | FILE:LINE | SUNSET | RATIONALE). O parser exige **6**:
+#
+#   ECOSYSTEM | FILE-PATH | FINDING-TYPE | SYMBOL-OR-LINE | REASON | SUNSET-DATE
+#
+#   ECOSYSTEM     ∈ {python, typescript, rust, go}          (_shared.py:174)
+#   FINDING-TYPE  ∈ {dead_code, symbol_fab, orphan_export, mutation_low}
+#   SUNSET-DATE   YYYY-MM-DD, no máximo 90 dias à frente
+#
+# Entrada com 4 campos dispara `allowlist_malformed_entry` (HARD) e aborta o
+# processamento da allowlist inteira. Divergência registrada em 2026-07-27; corrigir o
+# golden rule exige ADR (cycle-rule-schema.md § Golden Rule Change Protocol).
+
+# --- Entradas ativas -----------------------------------------------------------
+# ADR: knowledge-base/adrs/0001-parametros-de-contrato-de-interface-nao-sao-codigo-morto.md
+# Os 6 são parâmetros exigidos por contrato de interface, cujo corpo legitimamente não
+# os usa. Nenhum está no código do produto (src/, tests/, benchmarks/).
+python|.claude/skills/code-quality/scripts/detectors/__init__.py|dead_code|critical_paths|Assinatura de BaseDetector.detect_mutation_score; remover quebraria LSP nas implementacoes concretas|2026-10-25
+python|.claude/skills/code-quality/scripts/detectors/python.py|dead_code|critical_paths|Stub do detector D4 (mutacao, deferida); o parametro e herdado da assinatura base|2026-10-25
+python|.claude/skills/code-quality/scripts/detectors/go.py|dead_code|critical_paths|Stub do detector D4 (mutacao, deferida); mesmo motivo do python.py|2026-10-25
+python|.claude/skills/code-quality/scripts/detectors/rust.py|dead_code|critical_paths|Stub do detector D4 (mutacao, deferida); mesmo motivo do python.py|2026-10-25
+python|.claude/skills/code-quality/scripts/detectors/typescript.py|dead_code|critical_paths|Stub do detector D4 (mutacao, deferida); mesmo motivo do python.py|2026-10-25
+python|.claude/skills/review/scripts/spawn_reviewers.py|dead_code|option_string|Exigido pela assinatura de argparse.Action.__call__ na biblioteca padrao|2026-10-25
