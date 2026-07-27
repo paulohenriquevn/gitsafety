@@ -145,7 +145,7 @@ próprio.
 
 | ID | Requisito |
 |---|---|
-| **NFR-1** | **Instalação:** `pipx install gitsafety`. Python 3.9+. Dependência externa: apenas o parser de YAML. |
+| **NFR-1** | **Instalação:** `pipx install gitsafety`. **Python 3.10+** — 3.9 está EOL desde 2025-10-31 e um produto de segurança não declara suporte a interpretador sem patch (ver ADR D8 do plano do M0). Dependência externa: apenas o parser de YAML. |
 | **NFR-2** | **Latência no commit:** verificação dos arquivos em stage não deve ser perceptível no fluxo normal (alvo: < 1 s para um commit típico). |
 | **NFR-3** | **Superfície de CLI:** no máximo 4 flags no `scan`. Ampliar exige justificativa explícita. |
 | **NFR-4** | **A saída não vaza.** Segredo mascarado por padrão em toda saída e em qualquer log. |

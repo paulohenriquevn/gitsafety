@@ -12,7 +12,7 @@ pasta solta e em notebook Jupyter.
 
 ## Instalação
 
-Requer Python 3.9 ou superior.
+Requer Python 3.10 ou superior.
 
 ```bash
 pipx install gitsafety     # recomendado — isolado, disponível no PATH
