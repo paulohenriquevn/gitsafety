@@ -1,0 +1,18 @@
+# Discover-Plan Score Thresholds — SHIPPED DEFAULT (fallback).
+#
+# `_resolve_thresholds` in run_discover_plan_score.py falls back to this file when
+# the consuming project has no promoted rules/discover-plan-thresholds.txt. Without
+# it the fallback resolves to a non-existent path and the scorer crashes instead of
+# scoring — so this file existing is part of the skill's contract, not decoration.
+#
+# FORMAT — pipe-delimited: NAME|MIN_SCORE|SUNSET|ADR_REF
+# The parser splits on `|`; a line that does not yield two fields is skipped, which
+# would leave zero bands and force every verdict to INVALID.
+#
+# Verdict tokens are locked by rules/discover-plan-golden-rule.md § 5.
+# To tune per project, copy this file to rules/discover-plan-thresholds.txt.
+
+SHIPPABLE|90|2027-01-31|YOUR_ADR_REF
+SHIPPABLE_WITH_CAVEATS|70|2027-01-31|YOUR_ADR_REF
+NEEDS_REVISION|50|2027-01-31|YOUR_ADR_REF
+INVALID|0|2027-01-31|YOUR_ADR_REF
