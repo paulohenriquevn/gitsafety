@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+# Cancela execuções antigas do mesmo ref: o resultado que importa é o do último commit.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 é o piso declarado em pyproject.toml (ADR D8) e 3.13 o topo suportado.
+        # Testar as duas pontas é o que transforma `requires-python` de afirmação em
+        # evidência — declarar um piso sem exercê-lo é promessa sem lastro.
+        python-version: ["3.10", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # A instalação precede os testes porque tests/functional/test_installed_entry_point.py
+      # invoca o console script como subprocesso. Rodar pytest sem instalar faria esse
+      # teste falhar pelo motivo errado.
+      - name: Instala o pacote e as dependências de desenvolvimento
+        run: pip install -e ".[dev]"
+
+      - name: Confirma que o pytest está acima da versão com CVE
+        # GHSA-6w46-j5rx-g56g / PYSEC-2026-1845 — corrigido em 9.0.3 (ADR D8).
+        # O piso está no pyproject, mas um resolvedor mal configurado pode ignorá-lo;
+        # esta verificação transforma silêncio em falha.
+        run: |
+          python - <<'PY'
+          import sys
+          from importlib.metadata import version
+          atual = tuple(int(p) for p in version("pytest").split(".")[:3])
+          if atual < (9, 0, 3):
+              sys.exit(f"pytest {version('pytest')} carrega GHSA-6w46-j5rx-g56g; exigido >=9.0.3")
+          print(f"pytest {version('pytest')} — acima do piso de segurança")
+          PY
+
+      - name: Suíte de testes
+        run: pytest -q
+
+      - name: Benchmark de varredura
+        run: python benchmarks/bench_scan.py
