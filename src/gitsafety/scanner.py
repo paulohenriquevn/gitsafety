@@ -10,10 +10,35 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from re import Pattern
+from typing import TYPE_CHECKING
 
 from gitsafety.finding import Finding
 from gitsafety.rules import BUILTIN_RULES, Rule
 from gitsafety.walker import SkippedFile, walk
+
+if TYPE_CHECKING:  # evita ciclo em runtime; `config` importa deste módulo
+    from gitsafety.config import Config
+
+#: Marcador de supressão por linha (`docs/PRD.md § FR-14`).
+#:
+#: Procuramos a **substring**, sem exigir o caractere de comentário: linguagens usam
+#: `#`, `//`, `--`, `;`, `%`. Exigir um deles obrigaria a saber a linguagem do arquivo, e
+#: o falso positivo dessa escolha — a string aparecer fora de um comentário — é
+#: irrelevante: quem a escreve está pedindo a supressão de qualquer forma.
+INLINE_ALLOW_MARKER = "gitsafety: allow"
+
+
+def is_allowed(secret: str, line: str, allow: Sequence[Pattern[str]] = ()) -> bool:
+    """Diz se um achado deve ser suprimido — por marcador na linha ou por `allow:`.
+
+    Existe **uma vez** e é chamada pelos dois caminhos de varredura (arquivo e index).
+    Duplicá-la garantiria divergência na primeira mudança, e as duas cópias tratariam o
+    mesmo conhecimento — que é o que o DRY protege.
+    """
+    if INLINE_ALLOW_MARKER in line:
+        return True
+    return any(padrao.search(secret) for padrao in allow)
 
 
 @dataclass(frozen=True)
@@ -48,7 +73,12 @@ def _read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
 
 
-def _scan_text(text: str, path: Path, rules: Sequence[Rule]) -> list[Finding]:
+def _scan_text(
+    text: str,
+    path: Path,
+    rules: Sequence[Rule],
+    allow: Sequence[Pattern[str]] = (),
+) -> list[Finding]:
     findings: list[Finding] = []
     # `splitlines()` trata o arquivo com e sem `\n` final de forma idêntica, que é
     # justamente onde o off-by-one clássico aparece. `start=1` porque linha é 1-based.
@@ -57,6 +87,10 @@ def _scan_text(text: str, path: Path, rules: Sequence[Rule]) -> list[Finding]:
             # `finditer`, não `search`: dois segredos na mesma linha precisam gerar
             # dois findings. Com `search` o segundo sumiria sem qualquer sinal.
             for match in rule.pattern.finditer(line):
+                # `allow` e marcador agem DEPOIS do match (ADR D5): ambos dependem do
+                # valor encontrado, então não há como avaliá-los antes de tê-lo.
+                if is_allowed(match.group(0), line, allow):
+                    continue
                 findings.append(
                     Finding(
                         rule_id=rule.id,
@@ -68,16 +102,26 @@ def _scan_text(text: str, path: Path, rules: Sequence[Rule]) -> list[Finding]:
     return findings
 
 
-def scan_path(root: Path, rules: Sequence[Rule] = BUILTIN_RULES) -> ScanResult:
+def scan_path(
+    root: Path,
+    rules: Sequence[Rule] = BUILTIN_RULES,
+    *,
+    config: Config | None = None,
+) -> ScanResult:
     """Varre `root` (arquivo ou diretório) e devolve findings e pulos.
 
     Propaga `PathNotFoundError` de `walk` quando o caminho não existe — a validação
     mora na fronteira, e aqui os dados já são confiáveis.
     """
-    files, skipped = walk(Path(root))
+    from gitsafety.config import Config, effective_rules
+
+    cfg = config if config is not None else Config()
+    regras = effective_rules(cfg, rules)
+
+    files, skipped = walk(Path(root), cfg.ignore)
 
     findings: list[Finding] = []
     for path in files:
-        findings.extend(_scan_text(_read_text(path), path, rules))
+        findings.extend(_scan_text(_read_text(path), path, regras, cfg.allow))
 
     return ScanResult(findings=findings, skipped=skipped)

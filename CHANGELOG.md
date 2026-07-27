@@ -6,6 +6,23 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Added
 
+- **`.gitsafety.yml`** com três chaves: `ignore` (globs de caminho que nem são abertos),
+  `allow` (valores conhecidos que não geram finding) e `rules` (seus próprios padrões).
+  Todas opcionais — sem o arquivo, nada muda.
+- **`# gitsafety: allow`** na linha suprime o finding daquela linha. Funciona com qualquer
+  caractere de comentário.
+- **`--config PATH`** aponta outro arquivo de configuração.
+- Config malformada **para** a execução com exit 2 e a linha do erro; chave com erro de
+  digitação sugere a correta em vez de ser ignorada em silêncio.
+- Padrões vindos da sua configuração são **verificados antes de rodar**: regex inválida
+  vira erro com o nome da regra, e padrões que poderiam travar a verificação durante um
+  commit são recusados na carga.
+
+### Changed
+
+- **Primeira dependência de runtime do produto:** `pyyaml>=6.0.1,<7`, usada apenas através
+  de `safe_load`. É a única que o projeto autoriza.
+
 ### Changed
 
 ### Deprecated

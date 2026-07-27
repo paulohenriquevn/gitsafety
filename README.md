@@ -125,6 +125,14 @@ rules:
 Três chaves de topo — `ignore`, `allow`, `rules` — e nada mais. Sem herança de
 config, sem `condition: AND/OR`, sem regra composta.
 
+**Chave com erro de digitação não é ignorada.** `ignroe:` para o scan e sugere `ignore:` —
+o silêncio custaria a você uma sessão de depuração descobrindo que a config nunca foi lida.
+
+**Seus padrões são verificados antes de rodar.** Um regex inválido vira erro com o nome da
+regra. Um regex que poderia travar a verificação no meio de um commit — como
+`(a{1,50}){1,50}` — é recusado na carga, com a explicação. É o seu commit que estaria
+pendurado.
+
 YAML inválido ou regex que não compila **param o scan com erro apontando a linha**
 (exit code 2). Nunca são ignorados em silêncio.
 
@@ -206,8 +214,9 @@ gitsafety scan [CAMINHO]       verifica arquivos                        ✅ disp
   --show-secrets               mostra o segredo completo                ✅ disponível
 gitsafety --version                                                     ✅ disponível
 
+  --config PATH                arquivo de config (padrão: .gitsafety.yml) ✅ disponível
+
   --history                    também o histórico do git                ⏳ em construção
-  --config PATH                arquivo de config (padrão: .gitsafety.yml) ⏳ em construção
 ```
 
 Quatro flags no total. Se você sentir falta de uma quinta, provavelmente o caso é do

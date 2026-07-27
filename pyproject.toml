@@ -15,9 +15,12 @@ keywords = ["secrets", "pre-commit", "security", "scanner"]
 # pytest>=9.0.3 (a primeira versão sem GHSA-6w46-j5rx-g56g) exige >=3.10.
 requires-python = ">=3.10"
 
-# Zero dependências de runtime — docs/PRD.md § NFR-1 autoriza uma (o parser de
-# YAML), reservada ao M3. O M0 usa só argparse/pathlib/re/enum/dataclasses.
-dependencies = []
+# A ÚNICA dependência de runtime autorizada pelo docs/PRD.md § NFR-1, gasta no M3.
+# Piso 6.0.1 (não 6.0): a 6.0 tinha problema de build com Cython 3. Teto no major
+# porque uma major nova pode mudar o comportamento de safe_load sem aviso.
+# Superfície de uso: UMA função, `yaml.safe_load` (ADR D1 do M3).
+# A partir daqui o orçamento de dependências de runtime está esgotado.
+dependencies = ["pyyaml>=6.0.1,<7"]
 
 classifiers = [
     "Development Status :: 3 - Alpha",

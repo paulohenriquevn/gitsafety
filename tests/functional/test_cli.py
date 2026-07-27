@@ -10,9 +10,11 @@ vaza o segredo transformou-se no problema que ele deveria resolver.
 
 from __future__ import annotations
 
+import argparse
+
 import pytest
 
-from gitsafety.cli import main
+from gitsafety.cli import build_parser, main
 from gitsafety.errors import ExitCode
 
 SECRET = "AKIAIOSFODNN7EXAMPLE"
@@ -165,3 +167,54 @@ def test_unknown_flag_is_a_usage_error(dir_limpo):
     with pytest.raises(SystemExit) as exc:
         main(["scan", str(dir_limpo), "--flag-que-nao-existe"])
     assert exc.value.code == ExitCode.USAGE_ERROR
+
+
+# --- M3: configuração -----------------------------------------------------------
+
+
+def test_config_flag_loads_the_given_file(tmp_path, capsys):
+    """`FR-21`: `--config PATH` aponta outro arquivo."""
+    (tmp_path / "config.py").write_text(f'K = "{SECRET}"\n')
+    outro = tmp_path / "meu.yml"
+    outro.write_text(f'allow:\n  - "{SECRET}"\n')
+    assert main(["scan", str(tmp_path), "--config", str(outro)]) == ExitCode.SUCCESS
+
+
+def test_missing_explicit_config_is_a_usage_error(tmp_path):
+    """Caso negativo: pedir um arquivo que não existe é erro; o implícito ausente não é."""
+    assert (
+        main(["scan", str(tmp_path), "--config", str(tmp_path / "nao-existe.yml")])
+        == ExitCode.USAGE_ERROR
+    )
+
+
+def test_malformed_config_exits_two(tmp_path):
+    (tmp_path / "ruim.yml").write_text('ignore: "nao fecha\n')
+    assert main(["scan", str(tmp_path), "--config", str(tmp_path / "ruim.yml")]) == 2
+
+
+def test_inline_marker_suppresses_only_its_own_line(tmp_path, capsys):
+    """`FR-14`: a supressão é da LINHA, não do arquivo."""
+    (tmp_path / "a.py").write_text(f'ok = "{SECRET}"  # gitsafety: allow\nruim = "{SECRET}"\n')
+    assert main(["scan", str(tmp_path)]) == ExitCode.SECRETS_FOUND
+    saida = capsys.readouterr().out
+    assert "1 segredo encontrado" in saida
+
+
+def test_help_now_advertises_config(capsys):
+    with pytest.raises(SystemExit):
+        main(["scan", "--help"])
+    assert "--config" in capsys.readouterr().out
+
+
+def test_scan_has_at_most_four_flags():
+    """`docs/PRD.md § NFR-3`: teto de 4 flags no `scan`.
+
+    Conta as opções do subparser, descontando o `--help` que o argparse adiciona.
+    """
+    parser = build_parser()
+    sub = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
+    scan = sub.choices["scan"]
+    flags = {o for a in scan._actions for o in a.option_strings if o.startswith("--")}
+    flags.discard("--help")
+    assert len(flags) <= 4, flags

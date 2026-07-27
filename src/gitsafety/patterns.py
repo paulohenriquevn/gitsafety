@@ -123,6 +123,83 @@ def has_free_quantifier(pattern: str) -> bool:
     return False
 
 
+def has_nested_quantifier(pattern: str) -> bool:
+    """Diz se um grupo que **contém** quantificador é ele próprio quantificado.
+
+    `(a{1,50}){1,50}`, `(a+)+`, `(\\d{2,4})*` — é a forma clássica de backtracking
+    catastrófico. Todos os quantificadores podem estar limitados, então
+    `has_free_quantifier` não a alcança: `(a{1,50}){1,50}` tem teto em ambos e ainda
+    assim tenta um número astronômico de partições da entrada.
+
+    **Por que a detecção precisa ser estática.** A alternativa óbvia — rodar a regex
+    numa entrada de teste e cronometrar — não funciona como defesa primária: uma regex
+    patológica explode **durante a própria medição**, e a verificação de tempo só é
+    alcançada depois que a busca retorna. A defesa não pode depender de executar aquilo
+    de que ela protege. Isto foi descoberto na implementação do M3: a primeira versão
+    media com uma sonda de 4.000 caracteres e pendurou a suíte de testes.
+
+    A medição continua existindo como rede **secundária**, com sonda curta e progressiva
+    (ver `config._probe_is_fast_enough`), para formas que esta análise não preveja.
+    """
+    profundidade_de_classe = False
+    pilha: list[bool] = []  # por grupo aberto: contém quantificador?
+    i = 0
+    while i < len(pattern):
+        c = pattern[i]
+
+        if c == "\\":
+            i += 2
+            continue
+
+        if profundidade_de_classe:
+            if c == "]":
+                profundidade_de_classe = False
+            i += 1
+            continue
+
+        if c == "[":
+            profundidade_de_classe = True
+            i += 1
+            continue
+
+        if c == "(":
+            pilha.append(False)
+            i += 1
+            # Consome o prefixo de grupo especial — `(?:`, `(?=`, `(?!`, `(?<=`, `(?<!`,
+            # `(?P<nome>`. Sem isto, o `?` do prefixo seria contado como quantificador e
+            # todo grupo não-capturante viraria falso positivo: o nosso próprio
+            # `unique_token` gera `(?<!…)` e `(?!…)`, e o catálogo usa `(?:…)` em quase
+            # toda regra.
+            if i < len(pattern) and pattern[i] == "?":
+                prefixo = re.match(r"\?(?:P<[^>]*>|P=|[:=!>#]|<[=!])", pattern[i:])
+                i += len(prefixo.group(0)) if prefixo else 1
+            continue
+
+        if c == ")":
+            continha_quantificador = pilha.pop() if pilha else False
+            # O que vem depois do fecha-parênteses decide: se o grupo é quantificado e
+            # já continha quantificador dentro, é a forma perigosa.
+            resto = pattern[i + 1 :]
+            quantificado = bool(re.match(r"[*+?]|\{\d+(?:,\d*)?\}", resto))
+            if continha_quantificador and quantificado:
+                return True
+            # Um grupo quantificado conta como quantificador para o grupo que o contém.
+            if pilha and (continha_quantificador or quantificado):
+                pilha[-1] = True
+            i += 1
+            continue
+
+        eh_quantificador = c in "*+?" or (
+            c == "{" and re.match(r"\{\d+(?:,\d*)?\}", pattern[i:])
+        )
+        if eh_quantificador and pilha:
+            pilha[-1] = True
+
+        i += 1
+
+    return False
+
+
 def unique_token(secret_regex: str, *, case_insensitive: bool = False) -> Pattern[str]:
     """Padrão para segredo cujo valor carrega a própria identidade.
 

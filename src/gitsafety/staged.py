@@ -20,11 +20,15 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from gitsafety.finding import Finding
 from gitsafety.git import run_git
 from gitsafety.rules import BUILTIN_RULES, Rule
-from gitsafety.scanner import ScanResult
+from gitsafety.scanner import ScanResult, is_allowed
+
+if TYPE_CHECKING:  # evita ciclo em runtime; `config` importa deste módulo
+    from gitsafety.config import Config
 
 #: `@@ -a,b +c,d @@` — `c` é a primeira linha do lado NOVO, que é o que numeramos.
 _HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(?P<start>\d+)(?:,\d+)? @@")
@@ -104,7 +108,19 @@ def parse_added_lines(diff: str) -> list[AddedLine]:
     return linhas
 
 
-def scan_staged(cwd: Path, rules: Sequence[Rule] = BUILTIN_RULES) -> ScanResult:
+def _is_ignored_path(path: Path, ignore) -> bool:
+    """`ignore` no modo staged: o caminho do diff já é relativo à raiz do repositório."""
+    import fnmatch
+
+    return any(fnmatch.fnmatch(path.as_posix(), padrao) for padrao in ignore)
+
+
+def scan_staged(
+    cwd: Path,
+    rules: Sequence[Rule] = BUILTIN_RULES,
+    *,
+    config: Config | None = None,
+) -> ScanResult:
     """Varre o índice e devolve o mesmo `ScanResult` do `scan` de arquivos (ADR D9).
 
     Reusar o tipo é o que garante que `cli.render` mascare o segredo neste caminho sem
@@ -114,11 +130,22 @@ def scan_staged(cwd: Path, rules: Sequence[Rule] = BUILTIN_RULES) -> ScanResult:
     `skipped` é sempre vazio aqui: o git já decide o que entra no diff, então não há
     decisão de pulo nossa a reportar.
     """
+    from gitsafety.config import Config, effective_rules
+
+    cfg = config if config is not None else Config()
+    regras = effective_rules(cfg, rules)
+
     findings: list[Finding] = []
 
     for adicionada in parse_added_lines(staged_diff(cwd)):
-        for rule in rules:
+        if _is_ignored_path(adicionada.path, cfg.ignore):
+            continue
+        for rule in regras:
             for match in rule.pattern.finditer(adicionada.text):
+                # O hook é onde o falso positivo dói mais — a config precisa valer aqui
+                # tanto quanto no `scan` (Unresolved Question Q3 do plano do M3).
+                if is_allowed(match.group(0), adicionada.text, cfg.allow):
+                    continue
                 findings.append(
                     Finding(
                         rule_id=rule.id,

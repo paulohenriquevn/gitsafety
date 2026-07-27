@@ -112,6 +112,15 @@ class CommandNotOnPathError(UsageError):
         self.command = command
 
 
+class ConfigError(UsageError):
+    """`.gitsafety.yml` inválido, ou padrão de usuário recusado.
+
+    Erro de uso, não defeito nosso: o usuário escreveu o arquivo e é ele quem corrige.
+    A mensagem precisa dizer **onde** — chave, índice e id da regra — porque `config
+    inválida` sem localização manda a pessoa procurar no arquivo inteiro.
+    """
+
+
 class PathNotFoundError(UsageError):
     """Caminho de varredura inexistente.
 

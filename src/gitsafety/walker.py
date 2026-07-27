@@ -15,6 +15,8 @@ aparecer no resultado.
 
 from __future__ import annotations
 
+import fnmatch
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -68,7 +70,23 @@ def _classify(path: Path) -> SkipReason | None:
     return None
 
 
-def walk(root: Path) -> tuple[list[Path], list[SkippedFile]]:
+def _is_ignored(path: Path, root: Path, ignore: Sequence[str]) -> bool:
+    """Casa o caminho relativo POSIX contra os globs de `ignore`.
+
+    `fnmatch` sobre o caminho relativo, e não `Path.match`: o `Path.match` do stdlib não
+    trata `**` como o glob do shell, e `tests/fixtures/**` é exatamente a forma que o
+    usuário escreve.
+    """
+    if not ignore:
+        return False
+    try:
+        relativo = path.relative_to(root).as_posix()
+    except ValueError:
+        relativo = path.as_posix()
+    return any(fnmatch.fnmatch(relativo, padrao) for padrao in ignore)
+
+
+def walk(root: Path, ignore: Sequence[str] = ()) -> tuple[list[Path], list[SkippedFile]]:
     """Percorre `root` e separa o que varrer do que foi pulado.
 
     Aceita tanto diretório quanto arquivo único — `gitsafety scan arquivo.py` é uso
@@ -88,6 +106,12 @@ def walk(root: Path) -> tuple[list[Path], list[SkippedFile]]:
     files: list[Path] = []
     skipped: list[SkippedFile] = []
     for path in candidates:
+        # `ignore` age ANTES de qualquer leitura — é onde está o ganho (ADR D5), e o
+        # arquivo ignorado NÃO entra em `skipped` (ADR D6): aquela lista existe para
+        # mostrar decisão nossa, e ignorar é decisão do usuário. Reportá-la de volta
+        # seria ruído, e ruído mina a confiança tanto quanto falso positivo.
+        if _is_ignored(path, root, ignore):
+            continue
         reason = _classify(path)
         if reason is None:
             files.append(path)

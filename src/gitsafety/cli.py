@@ -16,6 +16,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from gitsafety import __version__
+from gitsafety.config import load_config
 from gitsafety.errors import ExitCode, GitsafetyError
 from gitsafety.hook import install_hook
 from gitsafety.scanner import ScanResult, scan_path
@@ -60,6 +61,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--show-secrets",
         action="store_true",
         help="mostra o segredo completo em vez de mascarado",
+    )
+    scan.add_argument(
+        "--config",
+        metavar="PATH",
+        help="arquivo de configuração (padrão: .gitsafety.yml na raiz do repositório)",
     )
 
     sub.add_parser("install", help="instala o hook de pre-commit neste repositório")
@@ -129,7 +135,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("  Emergência: git commit --no-verify")
             return ExitCode.SUCCESS
 
-        result = scan_staged(Path.cwd()) if args.staged else scan_path(args.path)
+        # A config é carregada ANTES da varredura: um erro nela precisa aparecer
+        # imediatamente, e não depois de percorrer mil arquivos.
+        cfg = load_config(Path(args.config) if args.config else None)
+        result = (
+            scan_staged(Path.cwd(), config=cfg)
+            if args.staged
+            else scan_path(args.path, config=cfg)
+        )
     except GitsafetyError as exc:
         print(f"erro: {exc.message}", file=sys.stderr)
         return exc.exit_code
