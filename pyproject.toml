@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gitsafety"
+version = "0.1.0"
+description = "Não deixa você commitar uma chave de API."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Paulo Henrique" }]
+keywords = ["secrets", "pre-commit", "security", "scanner"]
+
+# Piso 3.10 — ADR D8 do plano do M0. Python 3.9 está EOL desde 2025-10-31, e
+# pytest>=9.0.3 (a primeira versão sem GHSA-6w46-j5rx-g56g) exige >=3.10.
+requires-python = ">=3.10"
+
+# Zero dependências de runtime — docs/PRD.md § NFR-1 autoriza uma (o parser de
+# YAML), reservada ao M3. O M0 usa só argparse/pathlib/re/enum/dataclasses.
+dependencies = []
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+]
+
+[project.optional-dependencies]
+# pytest < 9.0.3 carrega GHSA-6w46-j5rx-g56g / PYSEC-2026-1845 (manipulação
+# vulnerável de /tmp/pytest-of-{user} em UNIX). O piso não pode ser afrouxado.
+dev = ["pytest>=9.0.3,<10"]
+
+[project.scripts]
+gitsafety = "gitsafety.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
