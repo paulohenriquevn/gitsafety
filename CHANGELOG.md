@@ -14,6 +14,12 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
   credencial inteira (#M4)
 - Notebooks no formato antigo (`nbformat` v3) são reconhecidos — antes o código dessas
   células passava sem verificação (#M4)
+- **Todo o conteúdo do notebook é verificado**, não apenas o código e as saídas de texto:
+  tabelas HTML de resultado (o `repr` de um DataFrame), saídas em JSON e markdown, anexos
+  de células markdown, e os parâmetros de execução gravados pelo papermill nos metadados.
+  Cada um desses já foi caminho de vazamento real (#M4)
+- Segredo nos metadados do notebook é localizado como `metadados do notebook`; anexos e
+  metadados de célula apontam a célula a que pertencem (#M4)
 
 ### Changed
 
@@ -21,6 +27,17 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
   linhas longas ao salvar, e o valor partido escapava da verificação (#M4)
 - Notebook corrompido ou truncado volta a ser lido como texto em vez de ser recusado — um
   arquivo que o parser não entende ainda pode conter a chave (#M4)
+- O mesmo segredo em dois lugares do notebook gera **dois** achados. Você precisa saber de
+  todos os lugares de onde removê-lo, não apenas do primeiro (#M4)
+
+### Fixed
+
+- `# gitsafety: allow` volta a funcionar em linha que o Jupyter partiu ao salvar. A
+  supressão que você pede não deve depender de onde o editor escolheu quebrar a linha (#M4)
+- Segredo com acento ou outro caractere não-ASCII não é mais reportado duas vezes, e o
+  valor exibido é o que está de fato no arquivo (#M4)
+- Um `.ipynb` corrompido de forma extrema não interrompe mais a varredura dos demais
+  arquivos do diretório (#M4)
 
 ### Deprecated
 
