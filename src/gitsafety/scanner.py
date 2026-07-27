@@ -155,6 +155,8 @@ def _localise(
     do_notebook: list[tuple[Finding, bool]] | None,
     raw: str,
     rules: Sequence[Rule],
+    *,
+    incluir_extras: bool = True,
 ) -> list[Finding]:
     """Usa o documento parseado para MELHORAR a localização do que o texto já encontrou.
 
@@ -178,6 +180,16 @@ def _localise(
     Um achado do parser que não existe em nenhuma linha isolada é um valor que o Jupyter
     partiu entre elementos — invisível ao texto por construção. Esse entra como achado
     **adicional**, e é o caso que originou o milestone.
+
+    `incluir_extras=False` desliga essa adição, e existe para os caminhos que veem só
+    **parte** do arquivo. No `scan`, `do_texto` cobre o arquivo inteiro, então toda sobra é
+    de fato um valor partido. No hook, `do_texto` cobre só as linhas ADICIONADAS — e aí
+    todo segredo preexistente do notebook vira sobra e seria reportado, quebrando o
+    contrato que `staged.py` declara: *o hook reclama do que você introduz, não de segredo
+    que já estava num arquivo que você por acaso tocou*.
+
+    Com ele desligado a função vira enriquecimento puro: melhora a localização de achados
+    que já existem, e nunca cria achado novo.
     """
     if do_notebook is None:
         return do_texto
@@ -222,11 +234,12 @@ def _localise(
     #   gravado sem indentação põe o arquivo inteiro numa linha só, onde um único
     #   `# gitsafety: allow` calaria todos os segredos do documento. O parser vê a linha da
     #   célula, que é a que o usuário escreveu, e é a leitura correta.
-    ordenado.extend(
-        (linha if linha is not None else len(linhas) + 1, finding)
-        for indice, (finding, suprimido, linha) in enumerate(localizados)
-        if indice not in usados and not suprimido
-    )
+    if incluir_extras:
+        ordenado.extend(
+            (linha if linha is not None else len(linhas) + 1, finding)
+            for indice, (finding, suprimido, linha) in enumerate(localizados)
+            if indice not in usados and not suprimido
+        )
     # `sorted` é estável: empates mantêm a ordem do documento, que é a ordem das células.
     return [finding for _, finding in sorted(ordenado, key=lambda par: par[0])]
 

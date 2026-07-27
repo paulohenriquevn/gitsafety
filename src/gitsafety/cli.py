@@ -106,7 +106,12 @@ def render(result: ScanResult, *, show_secrets: bool) -> str:
         total = len(result.skipped)
         plural = "s" if total > 1 else ""
         linhas.append("")
-        linhas.append(f"  {total} arquivo{plural} pulado{plural} (binário ou acima de 1 MB).")
+        linhas.append(f"  {total} arquivo{plural} pulado{plural} (binário ou acima de 1 MB):")
+        # Dizer QUANTOS sem dizer QUAIS cumpre a letra do contrato do M0 e falha o
+        # propósito: o usuário não tem como decidir se precisa inspecionar. `SkippedFile`
+        # já carrega o caminho; só faltava imprimi-lo.
+        for pulado in result.skipped:
+            linhas.append(f"    {pulado.path}")
 
     return "\n".join(linhas)
 
@@ -160,7 +165,9 @@ def render_history(
             f"  Atenção: {reescritos} commit{plural} reescrito{plural} "
             f"não {verbo} verificado{plural}."
         )
-        linhas.append("  Reescrever o histórico não desfaz a exposição — revogue a chave.")
+        linhas.append(
+            "  Se foi para remover uma chave, revogue-a: reescrever não desfaz a exposição."
+        )
 
     return "\n".join(linhas)
 

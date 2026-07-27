@@ -162,6 +162,65 @@ def parse_commits(raw: str) -> list[tuple[CommitInfo, str]]:
     return commits
 
 
+def _localizar_notebooks(
+    introducao: dict,
+    ordem: list,
+    cwd: Path,
+    regras,
+    allow,
+) -> dict:
+    """Troca a linha do JSON pela célula, nos achados que estão em notebook.
+
+    Mesmo mecanismo do `--staged` e do `scan`: `scanner._localise` pareia o achado bruto
+    com o achado do documento parseado **pela linha do arquivo**. O conteúdo vem do commit
+    da introdução (`git show <sha>:<caminho>`), que é onde o achado está.
+
+    Este módulo NÃO usava `_localise` — e uma mensagem de commit minha afirmou que usava.
+    Era falso, e o review pegou. A issue #6 estava fechada para dois dos três alvos.
+
+    Custo: uma chamada ao git por notebook **que tenha achado**.
+    """
+    from gitsafety.notebook import is_notebook
+    from gitsafety.scanner import _localise, _scan_notebook
+
+    resultado = {chave: introducao[chave][0] for chave in ordem}
+
+    por_arquivo: dict[tuple[str, str], list] = {}
+    for chave in ordem:
+        finding, commit = introducao[chave]
+        if is_notebook(finding.path):
+            por_arquivo.setdefault((commit.sha, str(finding.path)), []).append(chave)
+
+    for (sha, caminho), chaves in por_arquivo.items():
+        try:
+            bruto = run_git(["show", f"{sha}:{caminho}"], cwd=cwd)
+        except GitsafetyError:
+            # Caminho que o git não resolve naquele commit (rename, por exemplo): fica com
+            # a localização bruta, que é pior mas nunca silêncio.
+            continue
+        achados = [introducao[c][0] for c in chaves]
+        melhorados = _localise(
+            achados,
+            _scan_notebook(bruto, Path(caminho), regras, allow),
+            bruto,
+            regras,
+            incluir_extras=False,
+        )
+        # `incluir_extras=False` porque este caminho vê só as linhas ADICIONADAS de cada
+        # commit, não o arquivo inteiro: com ele ligado, todo segredo preexistente do
+        # notebook viraria "sobra" e seria reportado como se tivesse sido introduzido ali.
+        # Assim a função é enriquecimento puro — melhora a localização, nunca cria achado.
+        #
+        # `_localise` devolve na ordem dos achados de texto, então o pareamento posicional
+        # é seguro.
+        # `strict=False` de propósito: `_localise` pode devolver sobras (valor partido entre
+        # elementos) que não têm chave correspondente. Emparelhar até o menor é o correto.
+        for chave, melhorado in zip(chaves, melhorados, strict=False):
+            resultado[chave] = melhorado
+
+    return resultado
+
+
 def rewritten_commits(cwd: Path) -> int:
     """Quantos commits existem só no reflog local, fora de qualquer referência.
 
@@ -256,9 +315,11 @@ def scan_history(
         for chave in vistos_no_commit:
             entradas[chave] += 1
 
+    localizados = _localizar_notebooks(introducao, ordem, cwd, regras, cfg.allow)
+
     return [
         HistoryFinding(
-            finding=introducao[chave][0],
+            finding=localizados[chave],
             commit=introducao[chave][1],
             introductions=entradas[chave],
         )

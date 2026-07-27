@@ -330,3 +330,34 @@ def test_no_warning_when_history_was_not_rewritten(repo):
     """Repositório comum não recebe aviso — senão vira ruído que ninguém lê."""
     repo.commit("a.py", "x = 1\n")
     assert rewritten_commits(repo.path) == 0
+
+
+def test_history_localises_notebook_by_cell(repo):
+    """A issue #6 vale para os TRÊS alvos, não para dois.
+
+    Eu havia afirmado numa mensagem de commit que `--history` usava `scanner._localise` —
+    era falso, o módulo nem o importava. O revisor conferiu e mostrou. Este teste existe
+    para que a afirmação passe a ser verificável em vez de confiável.
+    """
+    import json
+
+    notebook = {
+        "cells": [
+            {"cell_type": "code", "source": ["import os\n"], "metadata": {}, "outputs": []},
+            {
+                "cell_type": "code",
+                "source": [f'AWS = "{AKIA}"\n'],
+                "metadata": {},
+                "outputs": [],
+            },
+        ],
+        "metadata": {},
+        "nbformat": 4,
+        "nbformat_minor": 5,
+    }
+    repo.commit("a.ipynb", json.dumps(notebook, indent=1), "notebook")
+
+    achados = scan_history(repo.path)
+
+    assert len(achados) == 1
+    assert "célula 2" in str(achados[0].finding.path)

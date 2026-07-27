@@ -202,3 +202,43 @@ def test_staged_and_scan_agree_on_a_notebook(tmp_git_repo, stage):
 
     assert do_hook == do_scan, (do_hook, do_scan)
     assert do_hook == {"célula 1 (código)"}
+
+
+def test_hook_does_not_report_a_preexisting_secret_in_a_notebook(
+    tmp_git_repo, stage, git_commit
+):
+    """O hook reclama do que você INTRODUZ, não do que já estava no arquivo.
+
+    A localização por célula quebrou isto quando chegou: `_localise` foi escrito para o
+    `scan`, onde a varredura de texto cobre o arquivo INTEIRO, e ali toda sobra é um valor
+    partido pelo Jupyter. No hook o texto cobre só as linhas adicionadas — então todo
+    segredo preexistente virava sobra e era reportado.
+
+    `incluir_extras=False` desliga esse ramo nos caminhos que veem parte do arquivo.
+    """
+    import json
+
+    def notebook(*celulas):
+        return json.dumps(
+            {
+                "cells": [
+                    {"cell_type": "code", "source": [c], "metadata": {}, "outputs": []}
+                    for c in celulas
+                ],
+                "metadata": {},
+                "nbformat": 4,
+                "nbformat_minor": 5,
+            },
+            indent=1,
+        )
+
+    stage("a.ipynb", notebook(f'ANTIGO = "{SECRET}"\n'))
+    git_commit("segredo preexistente")
+
+    novo = "ghp_" + "a" * 36
+    stage("a.ipynb", notebook(f'ANTIGO = "{SECRET}"\n', f'NOVO = "{novo}"\n'))
+
+    achados = scan_staged(tmp_git_repo).findings
+
+    assert [f.secret for f in achados] == [novo], "só o que foi introduzido"
+    assert "célula 2" in str(achados[0].path)

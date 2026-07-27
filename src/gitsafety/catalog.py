@@ -524,6 +524,21 @@ _PALAVRAS_DE_SEGREDO = (
 #: As lookaheads têm teto (`{0,79}`, não `*`) porque o guard do M2 proíbe quantificador
 #: livre no catálogo — nenhuma regex pode pendurar o commit de alguém. Medido: 0,025 s no
 #: pior caso adversarial de 4.000 caracteres.
+#: **Falso positivo conhecido, medido e aceito.** Anotação de tipo em Python casa esta
+#: regra: `private_key: PKCS7PrivateKeyTypes` tem palavra-chave, o `:` que está em
+#: `_OPERATOR`, e um valor de 20+ caracteres com dígito e letra. Num corpus independente de
+#: 1,3 milhão de linhas foram **3 ocorrências** — 0,23 por 100 mil linhas.
+#:
+#: Tentei recusá-las por lookahead e o resultado foi pior que o problema: a expressão
+#: passou a ter **quantificador aninhado**, que é exatamente o que o guard de ReDoS do M3
+#: proíbe, e ainda assim não pegava `PKCS7PrivateKeyTypes`, que não tem ponto.
+#:
+#: Separar `PKCS7PrivateKeyTypes` de `Xk8fJ2mNp4qRt6vYw9zAb1cDe3fGh5jK` exigiria heurística
+#: de entropia — que o `README.md` rejeita explicitamente, porque é o que enche relatório de
+#: falso positivo. E `password: S3nh4L0ngaDeVerdade` em YAML tem a MESMA forma da anotação:
+#: a ambiguidade é da linguagem, não da regra.
+#:
+#: A saída é a que o produto já oferece: `allow:` ou `ignore:` para o caminho afetado.
 _VALOR_DE_SEGREDO = (
     r"(?=[A-Za-z0-9/+=_.\-]{0,79}[0-9])"
     r"(?=[A-Za-z0-9/+=_.\-]{0,79}[A-Za-z])"

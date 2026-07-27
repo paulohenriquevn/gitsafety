@@ -28,7 +28,6 @@ from gitsafety.git import run_git
 from gitsafety.notebook import is_notebook
 from gitsafety.rules import BUILTIN_RULES, Rule
 from gitsafety.scanner import ScanResult, is_allowed
-from gitsafety.walker import MAX_FILE_BYTES
 
 if TYPE_CHECKING:  # evita ciclo em runtime; `config` importa deste módulo
     from gitsafety.config import Config
@@ -167,43 +166,25 @@ def _is_ignored_path(path: Path, ignore) -> bool:
     return any(fnmatch.fnmatch(path.as_posix(), padrao) for padrao in ignore)
 
 
-#: Acima de quanto um arquivo BINÁRIO deixa de ser varrido no index.
-#:
-#: O teto é sobre binário, não sobre bytes. Copiar o limite de tamanho do `scan` para o
-#: hook seria a saída óbvia e errada: um `.env` de 2 MB com uma credencial deixaria de
-#: bloquear o commit, e isso é perda de cobertura no único caminho que não pode perder.
-#:
-#: Quem decide o que é binário é o **git**, não uma heurística nossa — `--numstat` marca
-#: esses arquivos com `-` no lugar da contagem de linhas. Usar a decisão dele torna o teto
-#: explicável ao usuário ("binário acima de 1 MB") e consistente com o `scan`, que já pula
-#: binário por extensão e qualquer arquivo acima deste mesmo limite.
-#:
-#: A primeira versão contava bytes das linhas do diff e **não funcionava**: 5 MB de arquivo
-#: viram 703 KB depois do diff, então o teto nunca era cruzado. Media a quantidade errada.
-#:
-#: E o pulo é REPORTADO. É o que separa este teto do fail-open que o M5 corrigiu: lá o git
-#: escondia o conteúdo sem avisar ninguém.
-_TETO_BINARIO_BYTES = MAX_FILE_BYTES
-
-
-def _binarios_grandes(cwd: Path) -> list[Path]:
-    """Arquivos que o git considera binários e que passam do teto, pelo tamanho no index."""
-    grandes: list[Path] = []
-    for linha in run_git(["diff", "--staged", "--numstat"], cwd=cwd).splitlines():
-        partes = linha.split("\t", 2)
-        # `-` no lugar da contagem de linhas é como o git marca binário.
-        if len(partes) != 3 or partes[0] != "-":
-            continue
-        caminho = _decode_path(partes[2])
-        try:
-            tamanho = int(run_git(["cat-file", "-s", f":{caminho}"], cwd=cwd))
-        except (GitsafetyError, ValueError):
-            # Caminho que o git não resolve (arquivo removido, por exemplo): na dúvida,
-            # varre. Pular por engano seria falso negativo; varrer por engano custa tempo.
-            continue
-        if tamanho > _TETO_BINARIO_BYTES:
-            grandes.append(Path(caminho))
-    return grandes
+# NOTA — por que NÃO existe teto de tamanho aqui.
+#
+# Um teto foi implementado e REVERTIDO (issue #5). Ele pulava o arquivo que o git marca
+# como binário no `--numstat` e passa de 1 MB. Ganhava 5,67 s -> 2,21 s num commit com
+# 30 MB de assets, e custava algo que não se paga:
+#
+# O `--numstat` honra o `.gitattributes`. Um `*.env -diff` no repositório fazia o git
+# marcar como binário um arquivo de TEXTO PURO de 1,6 MB, e o teto o pulava — devolvendo ao
+# repositório exatamente o poder de desligar o hook que o M5 tinha tirado dele com
+# `--text --no-textconv`. Uma otimização que reabre um fail-open não é uma troca; é uma
+# regressão com outro nome.
+#
+# A mitigação para o custo já existe e está documentada: pôr o caminho dos assets em
+# `ignore:`. Ela é explícita, o usuário a escolhe, e não depende de o git concordar com a
+# gente sobre o que é binário.
+#
+# Se alguém revisitar: o veredito de binariedade não pode vir de um canal que o próprio
+# repositório controla. Decidir por CONTEÚDO (`git cat-file blob` e procurar NUL) é o
+# caminho — mas aí é mais um processo por arquivo, e o custo precisa ser medido antes.
 
 
 def scan_staged_diff(
@@ -211,7 +192,6 @@ def scan_staged_diff(
     rules: Sequence[Rule] = BUILTIN_RULES,
     *,
     config: Config | None = None,
-    pular: Sequence[Path] = (),
 ) -> ScanResult:
     """Varre um diff já obtido. Existe separada para ser testável sem repositório.
 
@@ -220,19 +200,14 @@ def scan_staged_diff(
     mediu o preço de dois caminhos sobre a mesma coisa.
     """
     from gitsafety.config import Config, effective_rules
-    from gitsafety.walker import SkippedFile, SkipReason
 
     cfg = config if config is not None else Config()
     regras = effective_rules(cfg, rules)
 
     findings: list[Finding] = []
-    a_pular = set(pular)
-    pulados = [SkippedFile(path=caminho, reason=SkipReason.TOO_LARGE) for caminho in pular]
 
     for adicionada in parse_added_lines(diff):
         if _is_ignored_path(adicionada.path, cfg.ignore):
-            continue
-        if adicionada.path in a_pular:
             continue
 
         for rule in regras:
@@ -250,7 +225,7 @@ def scan_staged_diff(
                     )
                 )
 
-    return ScanResult(findings=findings, skipped=pulados)
+    return ScanResult(findings=findings, skipped=[])
 
 
 def scan_staged(
@@ -265,11 +240,10 @@ def scan_staged(
     nenhuma linha nova — o mascaramento mora no `Finding` justamente para que um caminho
     de saída novo não possa esquecê-lo.
 
-    `skipped` traz o que o teto de binário deixou de fora — nunca vazio por construção.
+    `skipped` é sempre vazio: o git decide o que entra no diff, e nós não pulamos nada por
+    conta própria — ver a nota acima sobre o teto que foi revertido.
     """
-    resultado = scan_staged_diff(
-        staged_diff(cwd), rules, config=config, pular=_binarios_grandes(cwd)
-    )
+    resultado = scan_staged_diff(staged_diff(cwd), rules, config=config)
     return _com_localizacao_de_notebook(resultado, cwd, rules, config=config)
 
 
@@ -325,7 +299,13 @@ def _com_localizacao_de_notebook(
             localizados.extend(achados)
             continue
         localizados.extend(
-            _localise(achados, _scan_notebook(bruto, caminho, regras, cfg.allow), bruto, regras)
+            _localise(
+                achados,
+                _scan_notebook(bruto, caminho, regras, cfg.allow),
+                bruto,
+                regras,
+                incluir_extras=False,
+            )
         )
 
     return ScanResult(findings=localizados, skipped=resultado.skipped)

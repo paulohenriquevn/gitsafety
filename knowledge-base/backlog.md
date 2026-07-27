@@ -150,44 +150,30 @@ silêncio para nome acentuado — mesma classe do defeito que a validação de i
 pegou, com o eixo no nome do arquivo em vez de no alvo. Direção da falha era ruído (reportava
 a mais), mas num projeto brasileiro acento em nome de arquivo é o caso comum.
 
-## B5 — RESOLVIDO: teto para binário grande no index, com o pulo reportado
+## B5 — REVERTIDO: o teto de binário reabria o fail-open do M5
 
-Corrigido ao fechar a issue #5. `staged.py::_binarios_grandes` pula o arquivo que **o git**
-marca como binário (`--numstat` com `-`) e cujo tamanho no index passa de 1 MB — o mesmo
-limite que o `scan` aplica desde o M0 — e reporta o pulo por `ScanResult.skipped`.
+O teto foi implementado ao fechar a issue #5 e **revertido no review**. Ele pulava o arquivo
+que o git marca como binário no `--numstat` e passa de 1 MB, e ganhava 5,67 s -> 2,21 s num
+commit com 30 MB de assets.
 
-Medido: 30 MB de assets mais um segredo em `app.py` caem de **5,67 s para 2,21 s**, com o
-segredo ainda bloqueando o commit e os três assets aparecendo como pulados.
+**Por que voltou atrás.** O `--numstat` honra o `.gitattributes`. Um `*.env -diff` no
+repositório fazia o git marcar como binário um arquivo de **texto puro** de 1,6 MB, sem um
+único byte NUL — e o teto o pulava. Isso devolve ao repositório exatamente o poder de
+desligar o hook que o M5 tinha tirado dele com `--text --no-textconv`. Medido: `exit=0`,
+"nenhum segredo encontrado", com a chave dentro.
 
-**Duas coisas que valem registro:**
+Uma otimização que reabre um fail-open não é uma troca; é uma regressão com outro nome.
 
-O teto é sobre **binário**, não sobre bytes. Copiar o limite de tamanho do `scan` para o
-hook era a saída óbvia e errada: um `.env` de 2 MB com credencial deixaria de bloquear o
-commit — perda de cobertura no único caminho que não pode perder.
+Dois problemas menores morreram junto: o teto existia só no `--staged` e não no
+`--history`, criando entre alvos a divergência que este projeto já identificou como origem
+histórica de defeitos; e custava 1 processo `git cat-file` por arquivo binário — 674 ms num
+repo com 300 binários, mais do que economizava.
 
-A primeira implementação contava bytes das linhas do diff e **não funcionava**: 5 MB de
-arquivo viram 703 KB depois do diff, e o teto nunca era cruzado. Media a quantidade errada,
-e o teste sintético que eu havia escrito passava — só medir o cenário real revelou.
+**O custo do caso de assets permanece**, e a mitigação é a que já existia e está
+documentada: `ignore:` no caminho. É explícita, o usuário a escolhe, e não depende de o git
+concordar com a gente sobre o que é binário.
 
-Medição colateral que corrige a moldura da issue: 5 MB de binário custam 3,17 s e 3 MB de
-texto custam 4,31 s. **O custo é volume, não binariedade.**
+**Se alguém revisitar:** o veredito de binariedade não pode vir de um canal que o próprio
+repositório controla. Decidir por CONTEÚDO (`git cat-file blob`, procurar NUL nos primeiros
+8 KB) é o caminho — com o custo medido antes, porque é mais um processo por arquivo.
 
-
-## B6 — Instalado num venv, o hook falha em todo commit fora dele
-
-**Origem:** dogfooding do próprio repositório (issue #3), minutos depois de instalar.
-
-**O que acontece:** `sh: gitsafety: not found`, exit 127, commit bloqueado. O `install`
-verifica o PATH **no momento da instalação**; nada verifica no momento do commit, e o
-ambiente de quem commita não é necessariamente o de quem instalou.
-
-**Direção da falha:** fechada, que é a decisão certa para uma ferramenta de segurança. Mas
-a mensagem que o usuário vê é do `sh`, não nossa, e não diz o que fazer. Quem instala numa
-sexta e volta na segunda com o venv desativado vai achar que a ferramenta quebrou.
-
-**Mitigação entregue:** o `README.md` § Instalação passou a recomendar `pipx` explicitamente
-e a explicar a consequência de usar venv.
-
-**Caminho se for fechado:** o hook gravado poderia detectar a ausência e imprimir uma
-mensagem nossa antes de falhar — mas isso significa lógica no arquivo de hook, que hoje tem
-duas linhas de propósito. Precisa de medição do trade antes de crescer.

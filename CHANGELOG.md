@@ -19,13 +19,11 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 - **`scan --history` avisa quando há commit reescrito.** Se você usou `git reset` ou
   `rebase` para "remover" uma chave, o comando não alcança esses commits — e agora diz
   isso, em vez de deixar você acreditar que o repositório está limpo (#7)
-- **O hook agora aponta a célula do notebook**, igual ao `gitsafety scan`. Antes ele dizia
+- **O hook e o `--history` agora apontam a célula do notebook**, igual ao `gitsafety scan`. Antes ele dizia
   `analise.ipynb:14` — a linha do JSON, que não existe quando você abre o arquivo no
   Jupyter — enquanto o `scan` já dizia `célula 2 (código)` (#6)
-- **Commit com pasta de assets ficou mais rápido.** Arquivo que o git considera binário e
-  passa de 1 MB deixa de ser verificado no commit — e o pulo **aparece na saída**, como já
-  acontece no `gitsafety scan`. Medido: 30 MB de assets caem de 5,7 s para 2,2 s. Arquivo
-  de texto continua sendo verificado por maior que seja (#5)
+- Quando um arquivo é pulado, a saída agora diz **qual** — antes dizia só quantos, o que
+  não permitia decidir se valia inspecionar
 
 ### Deprecated
 

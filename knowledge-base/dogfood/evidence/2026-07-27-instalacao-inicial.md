@@ -43,6 +43,15 @@ Falhar fechado é a decisão certa para uma ferramenta de segurança. Mas a mens
 usuário vê é do `sh`, não nossa, e não diz o que fazer. Um usuário que instala numa
 sexta-feira e volta na segunda com o venv desativado vai achar que a ferramenta quebrou.
 
+**5. O hook bloqueou um commit por causa da própria documentação.** Ao escrever no README
+o exemplo de falso positivo da regra genérica — `private_key: PKCS7PrivateKeyTypes` — o
+hook barrou o commit, corretamente: a linha casa a regra. A solução foi a que o próprio
+README ensina, um `<!-- gitsafety: allow -->` na linha.
+
+Vale registrar porque é o caso mais comum de atrito legítimo: **documentação que mostra o
+que a ferramenta detecta é, por definição, detectável**. Quem escreve um guia de segurança,
+um post-mortem ou um runbook vai bater nisso.
+
 ## O que isto NÃO prova
 
 Um dia de uso não é uso sustentado. Nada aqui sustenta uma alegação de `production-ready`

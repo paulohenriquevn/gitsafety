@@ -86,6 +86,14 @@ valor de 20+ caracteres **com dígito e letra**. Isso é o que separa uma creden
 identificador de código — `secret_key = settings.SECRET_KEY` não casa, `token = os.environ[...]`
 não casa. Medido sobre 72.570 linhas de código real: zero falsos positivos.
 
+Ela tem fronteira, e vale saber qual. **Não** pega: valor em outra linha, valor montado por
+concatenação, senha com símbolo nos primeiros 20 caracteres (`"S3nh4@Sup3r..."`), senha só
+de letras, e nomes que ela não conhece (`pwd`, `credential`). **Pega às vezes demais:**
+anotação de tipo em Python (`private_key: PKCS7PrivateKeyTypes`) <!-- gitsafety: allow -->
+tem a mesma forma de um
+segredo em YAML — 3 ocorrências em 1,3 milhão de linhas de código real. Para essas, use
+`allow:` ou `ignore:`.
+
 ---
 
 ## O que ele detecta
