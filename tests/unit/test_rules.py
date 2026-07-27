@@ -6,9 +6,11 @@ positives e false positives junto da definição. `rules/testing.md § 4.1` cham
 de cobrir os dois lentes: o acerto prova detecção, o não-acerto prova que a regra não
 vai inundar o usuário de ruído — e é a metade que a maioria das suítes esquece.
 """
+
 from __future__ import annotations
 
 import re
+from dataclasses import FrozenInstanceError
 
 import pytest
 
@@ -47,11 +49,11 @@ def test_aws_rule_extracts_exactly_the_key_and_nothing_around_it():
 # --- Não-acertos (false positives) --------------------------------------------
 
 NEAR_MISSES = [
-    "AKIA",                        # só o prefixo
-    "AKIAIOSFODNN7EXAMPL",         # 19 caracteres — um a menos (edge case de borda)
-    "AKIAiosfodnn7example",        # minúsculas
-    "AKIA-IOSFODNN7EXAMP",         # caractere fora da classe
-    "",                            # vazio
+    "AKIA",  # só o prefixo
+    "AKIAIOSFODNN7EXAMPL",  # 19 caracteres — um a menos (edge case de borda)
+    "AKIAiosfodnn7example",  # minúsculas
+    "AKIA-IOSFODNN7EXAMP",  # caractere fora da classe
+    "",  # vazio
 ]
 
 
@@ -101,7 +103,7 @@ def test_pattern_is_compiled_once_at_import_time():
 
 def test_rule_is_immutable():
     # Regra é dado, não estado — congelar evita mutação acidental entre arquivos.
-    with pytest.raises(Exception):
+    with pytest.raises(FrozenInstanceError):
         AWS_ACCESS_KEY_ID.id = "outro"  # type: ignore[misc]
 
 

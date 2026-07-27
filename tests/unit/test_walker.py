@@ -9,6 +9,7 @@ A segunda metade é a que realmente resolve o risco. O D1 admite que a heurísti
 erra; o que impede o erro de virar falso negativo silencioso é o pulo aparecer no
 resultado, não a heurística ser perfeita.
 """
+
 from __future__ import annotations
 
 import pytest

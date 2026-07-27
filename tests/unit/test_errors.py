@@ -5,6 +5,7 @@ saída viaja junto da exceção, em vez de ser reconstruído no `main` por uma c
 `if`. O teste que importa não é "o enum tem os valores certos" — é "toda exceção de
 domínio carrega um código", porque é isso que impede a cadeia de `if` de voltar.
 """
+
 from __future__ import annotations
 
 import pytest

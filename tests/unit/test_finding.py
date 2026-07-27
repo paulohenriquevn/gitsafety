@@ -5,8 +5,10 @@ o relatório de um detector de segredos não pode ser o próximo vazamento. O
 mascaramento vive no objeto que carrega o segredo, e não no renderizador, para que
 nenhum caminho de saída futuro (hook do M1, histórico do M5) possa esquecer de aplicá-lo.
 """
+
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
@@ -78,8 +80,9 @@ def test_finding_still_carries_the_raw_secret_for_show_secrets():
 
 
 def test_finding_is_immutable():
+    """Erro tipado, não "levanta alguma coisa" (`rules/testing.md` § 4.1)."""
     finding = Finding(rule_id="r", path=Path("a.py"), line=1, secret=SECRET)
-    with pytest.raises(Exception):
+    with pytest.raises(FrozenInstanceError):
         finding.line = 2  # type: ignore[misc]
 
 

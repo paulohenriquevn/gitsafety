@@ -6,11 +6,12 @@ padrão e é validada contra seus próprios exemplos positivos e negativos. O M0
 regra só, mas nasce nessa forma porque o M2 vai escalar para ≥ 40 e reescrever 40
 regras depois custa muito mais do que acertar o formato agora.
 """
+
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Pattern
+from re import Pattern
 
 
 @dataclass(frozen=True)

@@ -7,6 +7,7 @@ O teste mais importante do arquivo é
 `test_output_masks_the_secret_by_default`: um detector de segredos cujo relatório
 vaza o segredo transformou-se no problema que ele deveria resolver.
 """
+
 from __future__ import annotations
 
 import pytest

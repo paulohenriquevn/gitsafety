@@ -12,6 +12,7 @@ byte NUL é o risco nº 2 do `ROADMAP.md § M0` e erra em UTF-16.
 heurística erra; o que impede o erro de virar falso negativo silencioso é o pulo
 aparecer no resultado.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

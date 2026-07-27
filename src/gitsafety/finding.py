@@ -6,6 +6,7 @@ assim nenhum caminho de saída futuro (hook do M1, histórico do M5) pode esquec
 aplicá-lo. Esquecer de mascarar em um caminho novo transformaria o relatório de
 segurança no próximo vazamento.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

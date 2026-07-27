@@ -34,7 +34,13 @@ classifiers = [
 [project.optional-dependencies]
 # pytest < 9.0.3 carrega GHSA-6w46-j5rx-g56g / PYSEC-2026-1845 (manipulação
 # vulnerável de /tmp/pytest-of-{user} em UNIX). O piso não pode ser afrouxado.
-dev = ["pytest>=9.0.3,<10"]
+dev = [
+    "pytest>=9.0.3,<10",
+    # Um binário cobrindo lint + formatação. Substitui o trio isort/black/flake8 do
+    # ggshield (Makefile:44) por uma dependência só — `rules/parsimony-ladder.md`
+    # rung 4: não adicionar três ferramentas quando uma resolve.
+    "ruff>=0.6,<1",
+]
 
 [project.scripts]
 gitsafety = "gitsafety.__main__:main"
@@ -45,3 +51,21 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+
+[tool.ruff]
+line-length = 96
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes — nomes indefinidos, imports não usados
+    "I",       # isort
+    "UP",      # pyupgrade — idiomas obsoletos para o target-version
+    "B",       # flake8-bugbear — armadilhas reais, não estilo
+    "SIM",     # flake8-simplify
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Testes podem usar `assert` livremente e importar fixtures de forma não convencional.
+"tests/**" = ["S101"]

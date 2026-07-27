@@ -10,7 +10,10 @@ Dois defeitos clássicos deste tipo de código são cobertos explicitamente:
 Ambos produzem falso negativo silencioso, que é a categoria de defeito mais cara para
 um detector de segredos.
 """
+
 from __future__ import annotations
+
+from dataclasses import FrozenInstanceError
 
 import pytest
 
@@ -147,7 +150,7 @@ def test_has_findings_is_true_when_something_was_found(tmp_path):
 def test_scan_result_is_immutable(tmp_path):
     (tmp_path / "a.py").write_text("x = 1\n")
     result = scan_path(tmp_path)
-    with pytest.raises(Exception):
+    with pytest.raises(FrozenInstanceError):
         result.findings = []  # type: ignore[misc]
 
 

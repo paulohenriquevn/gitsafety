@@ -9,6 +9,7 @@ O orçamento é **absoluto e folgado** de propósito: pega regressão de ordem d
 grandeza, não ruído de máquina. Comparação relativa entre execuções é trabalho do
 `cycle-analysis`, com série histórica — não deste teste.
 """
+
 from __future__ import annotations
 
 from benchmarks.bench_scan import build_corpus, measure
@@ -55,7 +56,13 @@ def test_measure_reports_the_three_metrics(tmp_path):
     metrics = measure(tmp_path)
 
     # Assert
-    assert set(metrics) == {"total_s", "per_file_ms", "files_per_s", "files_scanned", "findings"}
+    assert set(metrics) == {
+        "total_s",
+        "per_file_ms",
+        "files_per_s",
+        "files_scanned",
+        "findings",
+    }
     assert metrics["files_per_s"] > 0
 
 

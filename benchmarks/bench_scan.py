@@ -8,6 +8,7 @@ O corpus é gerado em disco a cada execução, sem aleatoriedade, para que o nú
 comparável entre máquinas e entre milestones. Três métricas são reportadas; a que
 importa entre milestones é `files_per_s`, porque não depende do tamanho do corpus.
 """
+
 from __future__ import annotations
 
 import tempfile

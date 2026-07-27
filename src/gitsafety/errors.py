@@ -8,6 +8,7 @@ pertence ao erro, e apodrece a cada erro novo.
 O ggshield herda de `click.ClickException`; sem `click` (ADR D5), a base é `Exception`
 com um atributo. São as ~10 linhas previstas como consequência daquele ADR.
 """
+
 from __future__ import annotations
 
 from enum import IntEnum

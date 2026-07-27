@@ -4,11 +4,12 @@ Camada de aplicação: compõe `walker` (o que varrer), `rules` (o que procurar)
 `finding` (o que reportar). Não imprime nada e não chama `sys.exit` — isso é da
 interface (`rules/architecture.md § 1`).
 """
+
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
 
 from gitsafety.finding import Finding
 from gitsafety.rules import BUILTIN_RULES, Rule

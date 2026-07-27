@@ -5,6 +5,7 @@ o pacote resolver a partir do diretório de trabalho em vez do que foi instalado
 isso o subprocesso roda com `cwd` fora da raiz do repositório — dentro dela, um pacote
 mal empacotado ainda importaria e o teste passaria por engano.
 """
+
 from __future__ import annotations
 
 import subprocess

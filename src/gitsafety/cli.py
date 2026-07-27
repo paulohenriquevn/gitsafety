@@ -7,11 +7,12 @@ se traduz resultado em texto e em código de processo.
 `argparse` da stdlib, não `click` (ADR D5): `docs/PRD.md § NFR-1` autoriza uma
 dependência externa e ela está reservada ao parser de YAML do M3.
 """
+
 from __future__ import annotations
 
 import argparse
 import sys
-from typing import Sequence
+from collections.abc import Sequence
 
 from gitsafety import __version__
 from gitsafety.errors import ExitCode, GitsafetyError
