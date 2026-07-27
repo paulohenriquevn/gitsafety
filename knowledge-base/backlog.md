@@ -114,6 +114,13 @@ reescrever o histórico não desfaz a exposição — revogar a chave é a únic
 **Quando revisitar:** se o uso mostrar que gente conta com o comando para auditar a própria
 máquina. Aí o caminho é uma seção separada no relatório, não misturar com o histórico.
 
+## B4b — RESOLVIDO: C-quoting de caminho (era MEDIUM do review do M5)
+
+Corrigido em `staged.py::_decode_path`. `ignore:` valia para nome ASCII e falhava em
+silêncio para nome acentuado — mesma classe do defeito que a validação de integração do M5
+pegou, com o eixo no nome do arquivo em vez de no alvo. Direção da falha era ruído (reportava
+a mais), mas num projeto brasileiro acento em nome de arquivo é o caso comum.
+
 ## B5 — `--text` custa caro em binário, e não há teto por arquivo no hook
 
 **Origem:** review do M5, ao atacar as flags introduzidas para fechar o fail-open do

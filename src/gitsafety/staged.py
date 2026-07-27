@@ -35,7 +35,43 @@ _HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(?P<start>\d+)(?:,\d+)? @@")
 
 #: `+++ b/caminho` — o nome do arquivo novo. Vem do lado `+++` porque arquivo recém-criado
 #: tem `--- /dev/null` do lado antigo.
-_NEW_FILE_RE = re.compile(r"^\+\+\+ (?:b/)?(?P<path>.+)$")
+#:
+#: O `b/` **não** é consumido aqui: quando o git escreve o nome entre aspas, o prefixo fica
+#: DENTRO delas. Retirá-lo é trabalho de `_decode_path`, depois de desfazer o escape.
+_NEW_FILE_RE = re.compile(r"^\+\+\+ (?P<path>.+)$")
+
+
+def _decode_path(bruto: str) -> str:
+    """Devolve o nome do arquivo como o usuário o vê, não como o git o escreveu.
+
+    O git aplica *C-quoting* a nome com caractere não-ASCII, aspas, barra invertida ou
+    controle: `configuração.env` sai como `"b/configura\\303\\247\\303\\243o.env"`. E
+    acrescenta um tab ao fim de nome com espaço, para delimitá-lo.
+
+    Sem desfazer isso, o achado exibe uma string que não localiza o arquivo — e, pior,
+    `ignore:` compara contra ela e falha em **silêncio**. Um `ignore:` que vale para nome
+    ASCII e não para nome acentuado é pior que um que não existe: o usuário configura,
+    confere num arquivo qualquer e supõe que vale para todos. Num projeto brasileiro, acento
+    em nome de arquivo é o caso comum, não a cauda.
+
+    A decodificação usa `unicode_escape` da stdlib (`rules/parsimony-ladder.md` rung 2), que
+    desfaz o octal `\\NNN` e os escapes de aspa e barra. O resultado sai com um byte por
+    caractere (latin-1) e é reinterpretado como UTF-8, que é o que o git de fato gravou.
+    """
+    nome = bruto.rstrip("\t")
+
+    if nome.startswith('"') and nome.endswith('"') and len(nome) > 1:
+        nome = (
+            nome[1:-1]
+            .encode("latin-1", "backslashreplace")
+            .decode("unicode_escape")
+            .encode("latin-1", "replace")
+            # `errors="replace"` pelo mesmo motivo de `scanner._read_text`: um nome que não
+            # decodifica não pode derrubar a varredura dos demais arquivos.
+            .decode("utf-8", "replace")
+        )
+
+    return nome.removeprefix("b/")
 
 
 @dataclass(frozen=True)
@@ -101,7 +137,7 @@ def parse_added_lines(diff: str) -> list[AddedLine]:
     for raw in diff.splitlines():
         novo_arquivo = _NEW_FILE_RE.match(raw)
         if novo_arquivo:
-            alvo = novo_arquivo.group("path")
+            alvo = _decode_path(novo_arquivo.group("path"))
             # `/dev/null` do lado `+++` significa arquivo deletado: nada a varrer.
             caminho_atual = None if alvo == "/dev/null" else Path(alvo)
             continue

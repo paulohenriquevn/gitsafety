@@ -14,6 +14,8 @@ porque o finding existe.
 """
 
 from __future__ import annotations
+import pytest
+
 
 from gitsafety.staged import parse_added_lines, scan_staged
 
@@ -181,3 +183,33 @@ def test_scan_staged_on_a_clean_index_finds_nothing(tmp_git_repo, stage):
 def test_scan_staged_with_nothing_staged_finds_nothing(tmp_git_repo):
     # Edge case: `git commit` sem nada em stage; o hook ainda roda.
     assert scan_staged(tmp_git_repo).has_findings is False
+
+
+# --- Caminhos que o git escreve de forma especial --------------------------------
+
+
+@pytest.mark.parametrize(
+    ("linha_diff", "esperado"),
+    [
+        ("+++ b/simples.env", "simples.env"),
+        # Nome não-ASCII: o git C-quota por padrão, com o `b/` DENTRO das aspas.
+        ('+++ "b/configura\\303\\247\\303\\243o.env"', "configuração.env"),
+        # Nome com espaço: sem aspas, mas com um tab no fim.
+        ("+++ b/com espaco.env\t", "com espaco.env"),
+        # Aspas e barra invertida no nome são escapadas.
+        ('+++ "b/com\\"aspas.env"', 'com"aspas.env'),
+        ('+++ "b/com\\\\barra.env"', "com\\barra.env"),
+        # Sem o prefixo `b/` (o usuário pode ter `diff.noprefix`).
+        ("+++ semprefixo.env", "semprefixo.env"),
+    ],
+)
+def test_path_is_decoded_as_the_user_sees_it(linha_diff, esperado):
+    """O caminho no achado precisa ser o nome do arquivo, não a grafia do git.
+
+    Sem isso o usuário vê `"b/configura\\303\\247\\303\\243o.env"` e não localiza o arquivo
+    — e, pior, `ignore:` compara contra essa string e falha em SILÊNCIO. Um `ignore:` que
+    funciona para nome ASCII e não para nome acentuado é pior que um que não existe, e
+    acento em nome de arquivo é o caso comum aqui, não a cauda.
+    """
+    diff = "\n".join([linha_diff, "@@ -0,0 +1 @@", "+k = 'valor'"])
+    assert parse_added_lines(diff)[0].path.as_posix() == esperado

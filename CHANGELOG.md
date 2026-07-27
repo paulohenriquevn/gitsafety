@@ -14,6 +14,12 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Fixed
 
+- **`ignore:` volta a funcionar para arquivo com acento, espaço ou aspas no nome.** O git
+  escreve esses nomes de forma escapada, e a comparação falhava em silêncio — você
+  configurava, conferia num arquivo qualquer e supunha que valia para todos (#M6)
+- O achado passa a mostrar o nome do arquivo como você o vê, em vez de
+  `"b/configura\303\247\303\243o.env"` (#M6)
+
 ### Security
 
 ## [0.6.0] - 2026-07-27
