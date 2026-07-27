@@ -50,8 +50,6 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Removed
 
-### Fixed
-
 ### Security
 
 ## [0.4.0] - 2026-07-27
