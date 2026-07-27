@@ -192,17 +192,22 @@ vazamento. `--show-secrets` mostra o valor completo quando você realmente preci
 ## Todas as flags
 
 ```
-gitsafety install              instala o hook de pre-commit neste repositório
-gitsafety scan [CAMINHO]       verifica arquivos
-  --staged                     apenas os arquivos em stage (o hook usa esta)
-  --history                    também o histórico do git
-  --config PATH                arquivo de config (padrão: .gitsafety.yml)
-  --show-secrets               mostra o segredo completo em vez de mascarado
-gitsafety --version
+gitsafety scan [CAMINHO]       verifica arquivos                        ✅ disponível
+  --show-secrets               mostra o segredo completo                ✅ disponível
+gitsafety --version                                                     ✅ disponível
+
+gitsafety install              instala o hook de pre-commit             ⏳ em construção
+  --staged                     apenas os arquivos em stage              ⏳ em construção
+  --history                    também o histórico do git                ⏳ em construção
+  --config PATH                arquivo de config (padrão: .gitsafety.yml) ⏳ em construção
 ```
 
-Quatro flags. Se você sentir falta de uma quinta, provavelmente o caso é do
+Quatro flags no total. Se você sentir falta de uma quinta, provavelmente o caso é do
 `.gitsafety.yml`.
+
+> **⏳ em construção** = faz parte do contrato do produto e ainda não foi implementado.
+> `gitsafety scan --help` sempre lista **apenas** o que existe de verdade no binário que
+> você instalou — nenhuma flag anunciada na ajuda deixa de funcionar.
 
 ---
 
