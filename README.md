@@ -94,6 +94,20 @@ verifica **o código das células e também as saídas salvas**. É onde a chave
 com mais frequência — você apaga a célula, mas o `print(os.environ)` de três
 execuções atrás continua gravado no arquivo que vai para o commit.
 
+O achado aponta a **célula**, não a linha do JSON:
+
+```
+analise.ipynb :: célula 4 (saída):1   postgres-connection-string   post•••••••••.com
+```
+
+Um notebook aberto no Jupyter não tem linha 50, então reportar a linha do arquivo não
+ajudaria ninguém a achar o segredo. Saídas de `print`, de resultado de célula e de
+traceback de erro são todas verificadas — o traceback de uma chamada autenticada que
+falhou costuma guardar a credencial inteira.
+
+Notebook corrompido ou truncado não quebra a varredura: ele volta a ser lido como texto,
+porque um arquivo que o parser recusa ainda pode conter a chave.
+
 ---
 
 ## Configuração

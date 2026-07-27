@@ -6,7 +6,21 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Added
 
+- **Notebooks Jupyter (`.ipynb`) passam a ser lidos como notebook, não como texto.** O
+  achado aponta a **célula** e a linha dentro dela — `analise.ipynb :: célula 4 (saída):1`
+  — em vez da linha do JSON, que não existe quando você abre o arquivo no Jupyter (#M4)
+- Saídas salvas de `print`, de resultado de célula e de **traceback de erro** são
+  verificadas. O traceback de uma chamada autenticada que falhou costuma guardar a
+  credencial inteira (#M4)
+- Notebooks no formato antigo (`nbformat` v3) são reconhecidos — antes o código dessas
+  células passava sem verificação (#M4)
+
 ### Changed
+
+- Um segredo partido entre linhas de uma célula passa a ser encontrado. O Jupyter quebra
+  linhas longas ao salvar, e o valor partido escapava da verificação (#M4)
+- Notebook corrompido ou truncado volta a ser lido como texto em vez de ser recusado — um
+  arquivo que o parser não entende ainda pode conter a chave (#M4)
 
 ### Deprecated
 
