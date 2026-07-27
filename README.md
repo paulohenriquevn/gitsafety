@@ -5,8 +5,9 @@
 Um comando para instalar, um YAML para ajustar. Funciona em repositório git, em
 pasta solta e em notebook Jupyter.
 
-> **Status:** pré-1.0, em desenvolvimento. A interface abaixo é o contrato que
-> estamos construindo; ainda não há release publicado.
+> **Status:** pré-1.0. Publicado no PyPI e funcional — instale e use. O `1.0.0` fica
+> reservado para depois de uso sustentado em trabalho real, conforme
+> `.claude/rules/public-copy.md § 3`; testes e review não são evidência de uso.
 
 ---
 

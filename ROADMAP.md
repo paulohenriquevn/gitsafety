@@ -241,7 +241,7 @@ vazamento.
 
 ---
 
-### M6 — [ ] Publicação no PyPI *(pós-V1)*
+### M6 — [x] Publicação no PyPI *(pós-V1)*
 
 **Objetivo:** tornar o `pipx install gitsafety` do README verdadeiro para terceiros.
 

@@ -6,6 +6,9 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Added
 
+- **Publicado no PyPI**: `pip install gitsafety` (ou `pipx install gitsafety`) funciona em
+  máquina limpa. A página do pacote linka o código, o changelog e os issues (#M6)
+
 ### Changed
 
 ### Deprecated
