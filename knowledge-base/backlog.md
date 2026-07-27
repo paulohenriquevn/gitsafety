@@ -51,3 +51,34 @@ comportamento.
 e evidência. O `gh` desta máquina está autenticado como outro usuário e não consegue criar
 no repositório (`must be a collaborator`), então o registro fica aqui. Vale promover a
 issue quando a autenticação estiver correta.
+
+## B3 — `scan --history` custa ~6 s em repositório pequeno; o eixo é linhas, não commits
+
+**Origem:** validação de integração do M5 (2026-07-27), rodando no próprio repositório.
+
+**Medido:**
+
+| Alvo | Commits | Linhas adicionadas | git | Varredura | Total |
+|---|---|---|---|---|---|
+| gitsafety (real) | 51 | 74.216 | 0,23 s | ~6 s | ~6 s |
+| Sintético | 5.000 | ~10.000 | 0,20 s | 0,16 s | 0,37 s |
+| Sintético | 1.000 | 50.000 | 0,10 s | 0,64 s | 0,74 s |
+
+**A causa é o desenho, não um defeito:** o custo é `linhas × 53 regras`, e o perfil confirma
+— 3,9 milhões de chamadas a `finditer`, com 4,6 s de overhead do laço em Python. Não há
+linha patológica: a maior tem 884 caracteres e a mediana é 42.
+
+**Por que o número sintético é otimista:** o gerador produz linhas curtas e uniformes
+(~10 caracteres). Uma regex custa proporcionalmente ao comprimento, então o piso sintético
+subestima o real em cerca de uma ordem de grandeza. O caveat está escrito no próprio
+benchmark.
+
+**Por que não foi otimizado no M5:** o `ROADMAP.md § M5` decide antecipadamente que o Risco
+nº 1 se resolve **documentando o custo**, não adicionando flags de tuning. E o M2 já mediu
+e decidiu contra um pré-filtro de literais. Reverter essa decisão exige medição própria —
+uma tentativa rápida durante o M5 produziu um filtro que deixava passar 100% das linhas, ou
+seja, ganho zero. Fazer direito é escopo de outro milestone.
+
+**Quando revisitar:** se o dogfooding mostrar que alguém deixa de rodar o comando por causa
+do tempo. O caminho provável é um pré-filtro de marcadores literais (`AKIA`, `ghp_`,
+`postgresql://`) construído a partir do catálogo, medido contra o corpus real.

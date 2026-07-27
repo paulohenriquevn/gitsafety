@@ -137,11 +137,17 @@ def test_help_advertises_staged_now_that_it_exists(capsys):
     assert "--staged" in capsys.readouterr().out
 
 
-def test_help_still_does_not_advertise_history(capsys):
-    """`--history` continua sendo M5 — anunciá-la agora seria mentir."""
+def test_help_advertises_history_now_that_it_exists(capsys):
+    """`--history` chegou no M5.
+
+    A versão anterior deste teste afirmava o **oposto** — que a flag não podia aparecer na
+    ajuda — porque anunciar o que não existe é mentir para quem lê o `--help`. Ele cumpriu
+    seu papel de M0 a M4 e agora inverte, que é o que um teste de contrato deve fazer quando
+    o contrato muda.
+    """
     with pytest.raises(SystemExit):
         main(["scan", "--help"])
-    assert "--history" not in capsys.readouterr().out
+    assert "--history" in capsys.readouterr().out
 
 
 def test_version_flag_prints_the_version(capsys):
@@ -218,3 +224,103 @@ def test_scan_has_at_most_four_flags():
     flags = {o for a in scan._actions for o in a.option_strings if o.startswith("--")}
     flags.discard("--help")
     assert len(flags) <= 4, flags
+
+
+# --- M5: `scan --history` -------------------------------------------------------
+
+
+def _repo_com_segredo(tmp_path):
+    import subprocess
+
+    def git(*args):
+        subprocess.run(["git", "-C", str(tmp_path), *args], check=True, capture_output=True)
+
+    git("init", "-q", "-b", "main", ".")
+    git("config", "user.email", "t@exemplo.com")
+    git("config", "user.name", "Teste")
+    (tmp_path / "config.py").write_text("AWS = 'AKIAIOSFODNN7EXAMPLE'\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "--no-verify", "-m", "adiciona credencial")
+    return tmp_path
+
+
+def test_history_flag_is_mutually_exclusive_with_staged(capsys, tmp_path):
+    """Caso negativo: os dois alvos juntos são incoerentes, e o argparse já diz isso."""
+    with pytest.raises(SystemExit) as exc:
+        main(["scan", "--staged", "--history"])
+    assert exc.value.code == 2
+
+
+def test_history_output_contains_commit_author_and_date(capsys, tmp_path, monkeypatch):
+    repo = _repo_com_segredo(tmp_path)
+    monkeypatch.chdir(repo)
+
+    codigo = main(["scan", "--history"])
+    saida = capsys.readouterr().out
+
+    assert codigo == 1
+    assert "Teste" in saida
+    assert "aws-access-key-id" in saida
+    assert "20" in saida  # a data ISO
+
+
+def test_history_masks_the_secret_by_default(capsys, tmp_path, monkeypatch):
+    monkeypatch.chdir(_repo_com_segredo(tmp_path))
+    main(["scan", "--history"])
+    assert "AKIAIOSFODNN7EXAMPLE" not in capsys.readouterr().out
+
+
+def test_history_show_secrets_reveals(capsys, tmp_path, monkeypatch):
+    monkeypatch.chdir(_repo_com_segredo(tmp_path))
+    main(["scan", "--history", "--show-secrets"])
+    assert "AKIAIOSFODNN7EXAMPLE" in capsys.readouterr().out
+
+
+def test_history_exit_code_is_0_on_clean_history(capsys, tmp_path, monkeypatch):
+    import subprocess
+
+    def git(*args):
+        subprocess.run(["git", "-C", str(tmp_path), *args], check=True, capture_output=True)
+
+    git("init", "-q", "-b", "main", ".")
+    git("config", "user.email", "t@exemplo.com")
+    git("config", "user.name", "Teste")
+    (tmp_path / "a.py").write_text("x = 1\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "--no-verify", "-m", "limpo")
+    monkeypatch.chdir(tmp_path)
+
+    assert main(["scan", "--history"]) == 0
+    assert "Nenhum segredo encontrado" in capsys.readouterr().out
+
+
+def test_history_shows_introduction_count_only_when_greater_than_one(
+    capsys, tmp_path, monkeypatch
+):
+    """Colapso silencioso esconde informação — a lição mais cara do M4."""
+    import subprocess
+
+    def git(*args):
+        subprocess.run(["git", "-C", str(tmp_path), *args], check=True, capture_output=True)
+
+    git("init", "-q", "-b", "main", ".")
+    git("config", "user.email", "t@exemplo.com")
+    git("config", "user.name", "Teste")
+    for conteudo, msg in [
+        ("AWS = 'AKIAIOSFODNN7EXAMPLE'\n", "c1"),
+        ("limpo\n", "c2"),
+        ("AWS = 'AKIAIOSFODNN7EXAMPLE'\n", "c3"),
+    ]:
+        (tmp_path / "a.py").write_text(conteudo, encoding="utf-8")
+        git("add", "-A")
+        git("commit", "-q", "--no-verify", "-m", msg)
+    monkeypatch.chdir(tmp_path)
+
+    main(["scan", "--history"])
+    assert "2 introduções" in capsys.readouterr().out
+
+
+def test_history_outside_a_repository_fails_clearly(capsys, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert main(["scan", "--history"]) == 2
+    assert "repositório" in capsys.readouterr().err.lower()

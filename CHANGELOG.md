@@ -6,6 +6,19 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Added
 
+- **`gitsafety scan --history`** — procura chaves que já foram commitadas e mostra em qual
+  commit entraram, por quem e quando. É o comando que responde "e a chave que eu commitei
+  mês passado?", que o hook não responde (#M5)
+- O achado aponta o commit da **introdução**, não o mais recente: saber desde quando a chave
+  está exposta é o que decide a urgência da revogação (#M5)
+- A saída avisa que remover o arquivo agora **não** apaga o segredo do histórico — quem não
+  souber disso "resolve" o incidente deixando a credencial ativa (#M5)
+- Uma credencial colada ao **resolver um conflito de merge** é encontrada. É um ponto cego
+  do comando que outras ferramentas usam, e foi medido antes de escolher o nosso (#M5)
+- O mesmo segredo repetido pelo histórico vira **um** achado; a contagem aparece ao lado
+  quando ele foi reintroduzido depois de ter saído (#M5)
+- `ignore:` do `.gitsafety.yml` vale também no histórico (#M5)
+
 ### Changed
 
 ### Deprecated

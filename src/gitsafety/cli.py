@@ -18,6 +18,7 @@ from pathlib import Path
 from gitsafety import __version__
 from gitsafety.config import load_config
 from gitsafety.errors import ExitCode, GitsafetyError
+from gitsafety.history import HistoryFinding, scan_history
 from gitsafety.hook import install_hook
 from gitsafety.scanner import ScanResult, scan_path
 from gitsafety.staged import scan_staged
@@ -56,6 +57,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--staged",
         action="store_true",
         help="verifica o que está no index do git, e não o disco",
+    )
+    alvo.add_argument(
+        "--history",
+        action="store_true",
+        help="procura segredos que já foram commitados no histórico",
     )
     scan.add_argument(
         "--show-secrets",
@@ -105,6 +111,41 @@ def render(result: ScanResult, *, show_secrets: bool) -> str:
     return "\n".join(linhas)
 
 
+def render_history(achados: Sequence[HistoryFinding], *, show_secrets: bool) -> str:
+    """Formata achados do histórico: onde o segredo entrou, e por quem.
+
+    O commit é o da **introdução** — "desde quando esta chave está exposta?" é a pergunta
+    que decide a urgência, e é a que o número responde.
+
+    A contagem de introduções só aparece quando é maior que 1, e aí significa algo
+    específico: a credencial voltou depois de ter saído. Mostrá-la sempre seria ruído;
+    escondê-la quando existe seria colapso silencioso, que é a lição mais cara do M4.
+    """
+    linhas: list[str] = []
+
+    for h in achados:
+        segredo = h.finding.secret if show_secrets else h.finding.masked_secret
+        repeticao = f"   ({h.introductions} introduções)" if h.introductions > 1 else ""
+        linhas.append(f"  {h.finding.path}:{h.finding.line}   {h.finding.rule_id}   {segredo}")
+        linhas.append(
+            f"      {h.commit.short_sha}  {h.commit.author}  {h.commit.date}{repeticao}"
+        )
+
+    if achados:
+        total = len(achados)
+        plural = "s" if total > 1 else ""
+        linhas.append("")
+        linhas.append(f"  {total} segredo{plural} encontrado{plural} no histórico.")
+        linhas.append("  Revogue a chave no provedor antes de qualquer outra coisa.")
+        # Apagar o arquivo não desfaz nada: o objeto continua no histórico de todo mundo
+        # que já clonou. Quem não souber disso vai "resolver" deixando a chave ativa.
+        linhas.append("  Remover o arquivo agora NÃO apaga o segredo do histórico.")
+    else:
+        linhas.append("  Nenhum segredo encontrado.")
+
+    return "\n".join(linhas)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Ponto de entrada. Devolve o código de saída, não o aplica.
 
@@ -138,6 +179,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         # A config é carregada ANTES da varredura: um erro nela precisa aparecer
         # imediatamente, e não depois de percorrer mil arquivos.
         cfg = load_config(Path(args.config) if args.config else None)
+        if args.history:
+            achados = scan_history(Path.cwd(), config=cfg)
+            print(render_history(achados, show_secrets=args.show_secrets))
+            return ExitCode.SECRETS_FOUND if achados else ExitCode.SUCCESS
+
         result = (
             scan_staged(Path.cwd(), config=cfg)
             if args.staged

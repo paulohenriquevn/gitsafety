@@ -108,6 +108,34 @@ falhou costuma guardar a credencial inteira.
 Notebook corrompido ou truncado não quebra a varredura: ele volta a ser lido como texto,
 porque um arquivo que o parser recusa ainda pode conter a chave.
 
+### Histórico
+
+O hook impede que a chave **entre**. Para saber se ela já entrou antes:
+
+```bash
+gitsafety scan --history
+```
+
+```
+config.py:1   aws-access-key-id   AKIA••••••••••••MPLE
+    b7cc2556  Ana  2026-07-27T15:33:54-03:00
+
+1 segredo encontrado no histórico.
+Revogue a chave no provedor antes de qualquer outra coisa.
+Remover o arquivo agora NÃO apaga o segredo do histórico.
+```
+
+O commit mostrado é o da **introdução** — "desde quando esta chave está exposta?" é a
+pergunta que decide a urgência. Apagar o arquivo hoje não resolve: o objeto continua no
+histórico de todo mundo que já clonou o repositório.
+
+Um segredo que aparece em vários commits vira **um** achado, com a contagem ao lado quando
+foi reintroduzido depois de sair.
+
+O custo é proporcional às linhas do histórico, não aos commits. No próprio repositório do
+gitsafety — 51 commits, 74 mil linhas adicionadas — leva cerca de 6 segundos. É um comando
+para rodar de vez em quando, não a cada commit; para isso existe o hook.
+
 ---
 
 ## Configuração
