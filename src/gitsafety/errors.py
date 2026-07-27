@@ -48,6 +48,70 @@ class UsageError(GitsafetyError):
     exit_code = ExitCode.USAGE_ERROR
 
 
+class GitUnavailableError(UsageError):
+    """O binário `git` não foi encontrado no PATH.
+
+    Distinto de `NotAGitRepositoryError` de propósito: numa máquina sem git, dizer
+    "não é um repositório git" manda a pessoa investigar o diretório quando o problema
+    é a ausência do programa.
+    """
+
+
+class NotAGitRepositoryError(UsageError):
+    """O caminho não está dentro de um repositório git."""
+
+    def __init__(self, path: str) -> None:
+        super().__init__(f"não é um repositório git: {path}")
+        self.path = path
+
+
+class HookExistsError(UsageError):
+    """Já existe um hook de pre-commit que não é nosso.
+
+    A mensagem carrega a linha exata a acrescentar no hook do usuário: recusar sem
+    dizer como prosseguir transfere o problema em vez de resolvê-lo
+    (precedente: ggshield `cmd/install.py:331-335`).
+    """
+
+    def __init__(self, path: str, line_to_add: str) -> None:
+        super().__init__(
+            f"já existe um hook em {path} e ele não é do gitsafety.\n"
+            f"Para não destruir o seu hook, nada foi alterado.\n"
+            f"Acrescente esta linha ao final dele:\n\n    {line_to_add}\n"
+        )
+        self.path = path
+        self.line_to_add = line_to_add
+
+
+class HookPathIsDirectoryError(UsageError):
+    """O caminho do hook é um diretório.
+
+    Erro próprio porque a remediação é outra: apagar um diretório é decisão do
+    usuário, não algo que `install` deva sugerir junto com "acrescente esta linha".
+    """
+
+    def __init__(self, path: str) -> None:
+        super().__init__(f"o caminho do hook é um diretório, não um arquivo: {path}")
+        self.path = path
+
+
+class CommandNotOnPathError(UsageError):
+    """`gitsafety` não é resolvível no PATH (ADR D8).
+
+    Falha na instalação em vez de no commit: o hook invoca `gitsafety` pelo PATH, e sem
+    esta verificação o erro apareceria como `gitsafety: not found` do shell, no meio de
+    um commit — momento em que a pessoa está fazendo outra coisa.
+    """
+
+    def __init__(self, command: str) -> None:
+        super().__init__(
+            f"'{command}' não foi encontrado no PATH.\n"
+            f"O hook o invoca pelo PATH, então ele precisa estar acessível quando você "
+            f"commitar. Ative o ambiente onde o gitsafety está instalado e tente de novo."
+        )
+        self.command = command
+
+
 class PathNotFoundError(UsageError):
     """Caminho de varredura inexistente.
 
