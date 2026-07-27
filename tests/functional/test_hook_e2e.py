@@ -11,14 +11,15 @@ numérico, e asserir texto acoplaria o teste à formatação.
 
 from __future__ import annotations
 
+import pytest
+
 from gitsafety.hook import install_hook
 
 SECRET = "AKIAIOSFODNN7EXAMPLE"
 
 
-def test_commit_with_a_new_secret_is_blocked(
-    tmp_git_repo, stage, git_commit, gitsafety_on_path
-):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_commit_with_a_new_secret_is_blocked(tmp_git_repo, stage, git_commit):
     # Arrange
     install_hook(tmp_git_repo)
     stage("config.py", f'API_KEY = "{SECRET}"\n')
@@ -30,9 +31,8 @@ def test_commit_with_a_new_secret_is_blocked(
     assert resultado.returncode != 0, resultado.stdout + resultado.stderr
 
 
-def test_clean_commit_succeeds_with_the_hook_installed(
-    tmp_git_repo, stage, git_commit, gitsafety_on_path
-):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_clean_commit_succeeds_with_the_hook_installed(tmp_git_repo, stage, git_commit):
     """O hook não pode atrapalhar o fluxo normal — é metade da razão de ele ser tolerado."""
     # Arrange
     install_hook(tmp_git_repo)
@@ -45,7 +45,8 @@ def test_clean_commit_succeeds_with_the_hook_installed(
     assert resultado.returncode == 0, resultado.stdout + resultado.stderr
 
 
-def test_no_verify_bypasses_the_hook(tmp_git_repo, stage, git_commit, gitsafety_on_path):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_no_verify_bypasses_the_hook(tmp_git_repo, stage, git_commit):
     """O bypass é nativo do git e não deve ser combatido (`docs/PRD.md § 6.1`)."""
     # Arrange
     install_hook(tmp_git_repo)
@@ -58,9 +59,8 @@ def test_no_verify_bypasses_the_hook(tmp_git_repo, stage, git_commit, gitsafety_
     assert resultado.returncode == 0, resultado.stdout + resultado.stderr
 
 
-def test_secret_only_on_disk_does_not_block_the_commit(
-    tmp_git_repo, stage, git_commit, gitsafety_on_path
-):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_secret_only_on_disk_does_not_block_the_commit(tmp_git_repo, stage, git_commit):
     """O RISCO Nº 1 DO ROADMAP, PONTA A PONTA.
 
     O índice tem conteúdo limpo; o disco tem o segredo. Uma implementação que lesse o
@@ -78,8 +78,9 @@ def test_secret_only_on_disk_does_not_block_the_commit(
     assert resultado.returncode == 0, resultado.stdout + resultado.stderr
 
 
+@pytest.mark.usefixtures("gitsafety_on_path")
 def test_blocked_commit_shows_the_masked_secret_not_the_real_one(
-    tmp_git_repo, stage, git_commit, gitsafety_on_path
+    tmp_git_repo, stage, git_commit
 ):
     """A saída do hook chega ao terminal do usuário — e não pode vazar (`PRD § NFR-4`).
 
@@ -99,9 +100,8 @@ def test_blocked_commit_shows_the_masked_secret_not_the_real_one(
     assert "AKIA" in saida  # o prefixo fica: identifica o provedor sem expor a chave
 
 
-def test_blocked_commit_tells_the_user_to_revoke(
-    tmp_git_repo, stage, git_commit, gitsafety_on_path
-):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_blocked_commit_tells_the_user_to_revoke(tmp_git_repo, stage, git_commit):
     """`PRD § FR-19`: remover a linha não desfaz a exposição."""
     install_hook(tmp_git_repo)
     stage("config.py", f'API_KEY = "{SECRET}"\n')
@@ -109,9 +109,8 @@ def test_blocked_commit_tells_the_user_to_revoke(
     assert "revogue" in saida.lower()
 
 
-def test_commit_is_actually_prevented_not_just_reported(
-    tmp_git_repo, stage, git_commit, gitsafety_on_path
-):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_commit_is_actually_prevented_not_just_reported(tmp_git_repo, stage, git_commit):
     """Exit code não-zero é o contrato; o efeito é o commit **não existir**.
 
     Um hook que reclama mas deixa o commit passar seria pior que nenhum: daria a falsa

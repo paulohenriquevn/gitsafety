@@ -22,7 +22,8 @@ from gitsafety.hook import HOOK_MARKER, hook_path_for, install_hook, is_our_hook
 # --- Estados degenerados (D6) --------------------------------------------------
 
 
-def test_install_refuses_when_a_foreign_hook_exists(tmp_git_repo, gitsafety_on_path):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_install_refuses_when_a_foreign_hook_exists(tmp_git_repo):
     """Nunca destruir configuração alheia — e dizer como prosseguir."""
     # Arrange
     alheio = hook_path_for(tmp_git_repo)
@@ -37,7 +38,8 @@ def test_install_refuses_when_a_foreign_hook_exists(tmp_git_repo, gitsafety_on_p
     assert HOOK_MARKER in str(exc.value)
 
 
-def test_refused_install_leaves_the_foreign_hook_untouched(tmp_git_repo, gitsafety_on_path):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_refused_install_leaves_the_foreign_hook_untouched(tmp_git_repo):
     """A recusa não pode ter efeito colateral."""
     # Arrange
     alheio = hook_path_for(tmp_git_repo)
@@ -53,7 +55,8 @@ def test_refused_install_leaves_the_foreign_hook_untouched(tmp_git_repo, gitsafe
     assert alheio.read_text(encoding="utf-8") == original
 
 
-def test_install_is_idempotent_when_the_hook_is_ours(tmp_git_repo, gitsafety_on_path):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_install_is_idempotent_when_the_hook_is_ours(tmp_git_repo):
     """Sem o marcador (D4), a segunda execução acusaria conflito com o próprio hook."""
     # Arrange
     install_hook(tmp_git_repo)
@@ -62,7 +65,8 @@ def test_install_is_idempotent_when_the_hook_is_ours(tmp_git_repo, gitsafety_on_
     install_hook(tmp_git_repo)
 
 
-def test_install_refuses_when_hook_path_is_a_directory(tmp_git_repo, gitsafety_on_path):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_install_refuses_when_hook_path_is_a_directory(tmp_git_repo):
     """Erro próprio: apagar um diretório é decisão do usuário, não sugestão nossa."""
     # Arrange
     caminho = hook_path_for(tmp_git_repo)
@@ -73,13 +77,15 @@ def test_install_refuses_when_hook_path_is_a_directory(tmp_git_repo, gitsafety_o
         install_hook(tmp_git_repo)
 
 
-def test_install_outside_a_git_repo_raises(tmp_path, gitsafety_on_path):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_install_outside_a_git_repo_raises(tmp_path):
     # Caso negativo.
     with pytest.raises(NotAGitRepositoryError):
         install_hook(tmp_path)
 
 
-def test_install_creates_the_hooks_directory_when_missing(tmp_git_repo, gitsafety_on_path):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_install_creates_the_hooks_directory_when_missing(tmp_git_repo):
     # Arrange — repositório sem diretório de hooks.
     import shutil
 
@@ -117,21 +123,25 @@ def test_install_fails_when_gitsafety_is_not_on_path(tmp_git_repo, monkeypatch):
 # --- Conteúdo e permissão do hook (D2) -----------------------------------------
 
 
-def test_installed_hook_is_executable_by_owner_only(tmp_git_repo, gitsafety_on_path):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_installed_hook_is_executable_by_owner_only(tmp_git_repo):
     """`0o700`, não `0o755`: o hook executa código e deve alcançar o mínimo de usuários."""
     escrito = install_hook(tmp_git_repo)
     assert oct(escrito.stat().st_mode)[-3:] == "700"
 
 
-def test_installed_hook_starts_with_sh_shebang(tmp_git_repo, gitsafety_on_path):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_installed_hook_starts_with_sh_shebang(tmp_git_repo):
     assert install_hook(tmp_git_repo).read_text(encoding="utf-8").startswith("#!/bin/sh")
 
 
-def test_installed_hook_invokes_scan_staged(tmp_git_repo, gitsafety_on_path):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_installed_hook_invokes_scan_staged(tmp_git_repo):
     assert HOOK_MARKER in install_hook(tmp_git_repo).read_text(encoding="utf-8")
 
 
-def test_installed_hook_forwards_arguments(tmp_git_repo, gitsafety_on_path):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_installed_hook_forwards_arguments(tmp_git_repo):
     """`"$@"` — o git passa argumentos a alguns hooks; engoli-los quebra o contrato."""
     assert '"$@"' in install_hook(tmp_git_repo).read_text(encoding="utf-8")
 
@@ -139,7 +149,8 @@ def test_installed_hook_forwards_arguments(tmp_git_repo, gitsafety_on_path):
 # --- Reconhecimento e localização ----------------------------------------------
 
 
-def test_is_our_hook_recognises_what_we_wrote(tmp_git_repo, gitsafety_on_path):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_is_our_hook_recognises_what_we_wrote(tmp_git_repo):
     assert is_our_hook(install_hook(tmp_git_repo)) is True
 
 
@@ -155,7 +166,8 @@ def test_is_our_hook_is_false_for_a_missing_file(tmp_path):
     assert is_our_hook(tmp_path / "nao-existe") is False
 
 
-def test_install_respects_core_hookspath(tmp_git_repo, gitsafety_on_path):
+@pytest.mark.usefixtures("gitsafety_on_path")
+def test_install_respects_core_hookspath(tmp_git_repo):
     """Edge case: `core.hooksPath` customizado — escrever em `.git/hooks` seria inútil."""
     # Arrange
     from gitsafety.git import run_git

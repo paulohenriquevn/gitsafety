@@ -1,0 +1,32 @@
+{
+  "verdict": "FAIL_SOFT",
+  "score_cap": 70,
+  "hard_caps_triggered": [
+    "soft_cap_python"
+  ],
+  "soft_caps_triggered": [
+    "critical_paths",
+    "option_string"
+  ],
+  "findings_by_detector": {
+    "d1_dead_code": {
+      "python": 6
+    },
+    "d2_symbol_fab": {
+      "python": 1
+    }
+  },
+  "severity_counts": {
+    "HARD": 0,
+    "SOFT_CAP": 6,
+    "SOFT_FLOOR": 0,
+    "INFO": 1
+  },
+  "languages_audited": [
+    "python"
+  ],
+  "schema_version": "0.1.0",
+  "languages_skipped": [],
+  "skip_reasons": {},
+  "mode": "standalone"
+}
