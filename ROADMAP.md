@@ -142,19 +142,19 @@ exit code correto.
 
 ---
 
-### M2 — [ ] Catálogo de padrões e mascaramento
+### M2 — [x] Catálogo de padrões e mascaramento
 
 **Objetivo:** cobrir os provedores comuns e garantir que a saída não vire o próximo
 vazamento.
 
 **Definition of done:**
 
-- [ ] ≥ 40 padrões cobrindo as 6 categorias do README, **cada um** com teste de acerto
+- [x] ≥ 40 padrões cobrindo as 6 categorias do README, **cada um** com teste de acerto
       e teste de não-acerto.
-- [ ] Segredo mascarado por padrão em toda saída; `--show-secrets` revela (PRD FR-16).
-- [ ] Repositório limpo de referência produz **zero findings** — é a métrica de falso
+- [x] Segredo mascarado por padrão em toda saída; `--show-secrets` revela (PRD FR-16).
+- [x] Repositório limpo de referência produz **zero findings** — é a métrica de falso
       positivo do PRD § 8, medida e registrada.
-- [ ] Padrões vivem em um arquivo de dados versionado, não espalhados pelo código.
+- [x] Padrões vivem em um arquivo de dados versionado, não espalhados pelo código.
 
 **Dependências:** M0.
 
