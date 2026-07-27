@@ -6,6 +6,16 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Added
 
+- **`gitsafety install`** — escreve `.git/hooks/pre-commit` e passa a verificar todo
+  commit. Respeita `core.hooksPath`, é idempotente, e **recusa-se a sobrescrever** um hook
+  de outra ferramenta: em vez disso imprime a linha exata a acrescentar no hook existente.
+- **`gitsafety scan --staged`** — verifica o que está no index do git em vez do disco, e
+  varre **apenas as linhas que estão sendo introduzidas**. Um segredo que está no disco mas
+  não foi para o index não bloqueia o commit; um que já estava commitado num arquivo tocado
+  também não. Para achar esses, use `gitsafety scan` na pasta.
+- `benchmarks/bench_hook.py` — mede o custo que o hook impõe ao commit, por diferença
+  pareada. Medido: **~0,04 s de overhead, constante** de 1 a 200 arquivos.
+
 ### Changed
 
 ### Deprecated

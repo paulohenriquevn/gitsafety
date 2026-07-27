@@ -13,10 +13,13 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
 from gitsafety import __version__
 from gitsafety.errors import ExitCode, GitsafetyError
+from gitsafety.hook import install_hook
 from gitsafety.scanner import ScanResult, scan_path
+from gitsafety.staged import scan_staged
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -38,17 +41,28 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command")
 
     scan = sub.add_parser("scan", help="verifica arquivos em busca de segredos")
-    scan.add_argument(
+    # `--staged` e um caminho posicional são incoerentes juntos: o índice é sempre o do
+    # repositório atual. O grupo mutuamente exclusivo produz mensagem melhor que uma
+    # validação manual depois do parse.
+    alvo = scan.add_mutually_exclusive_group()
+    alvo.add_argument(
         "path",
         nargs="?",
         default=".",
         help="arquivo ou diretório a verificar (padrão: diretório atual)",
+    )
+    alvo.add_argument(
+        "--staged",
+        action="store_true",
+        help="verifica o que está no index do git, e não o disco",
     )
     scan.add_argument(
         "--show-secrets",
         action="store_true",
         help="mostra o segredo completo em vez de mascarado",
     )
+
+    sub.add_parser("install", help="instala o hook de pre-commit neste repositório")
 
     return parser
 
@@ -100,14 +114,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"gitsafety {__version__}")
         return ExitCode.SUCCESS
 
-    if args.command != "scan":
+    if args.command not in ("scan", "install"):
         parser.print_help()
         return ExitCode.SUCCESS
 
+    # Um único `try` para os dois subcomandos: o código de saída vem sempre da própria
+    # exceção (ADR D4 do M0), então não há cadeia de `if isinstance` aqui — e nunca um
+    # `except Exception`, que transformaria defeito nosso em mensagem amigável.
     try:
-        result = scan_path(args.path)
+        if args.command == "install":
+            destino = install_hook(Path.cwd())
+            print(f"  hook instalado em {destino}")
+            print("  A partir de agora o commit é verificado.")
+            print("  Emergência: git commit --no-verify")
+            return ExitCode.SUCCESS
+
+        result = scan_staged(Path.cwd()) if args.staged else scan_path(args.path)
     except GitsafetyError as exc:
-        # O código vem da própria exceção (ADR D4) — sem cadeia de `if` aqui.
         print(f"erro: {exc.message}", file=sys.stderr)
         return exc.exit_code
 

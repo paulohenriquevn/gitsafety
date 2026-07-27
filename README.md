@@ -53,9 +53,14 @@ Emergência: `git commit --no-verify` passa por cima do hook.
 
 ## Por que ele não enche o saco
 
-O hook verifica **apenas os arquivos que entram no commit** (`--staged`), não o
-repositório inteiro. Fora isso, pula binários e arquivos acima de 1 MB. Na prática o
-commit não fica perceptivelmente mais lento.
+O hook verifica **apenas as linhas que você está introduzindo** — não o repositório
+inteiro, e nem mesmo o arquivo inteiro. Medido: o commit fica **~0,04 s** mais lento,
+independente de tocar 1 ou 200 arquivos.
+
+Isso tem uma consequência que vale saber: se um arquivo **já tinha** um segredo commitado
+antes e você edita outra linha dele, o hook não reclama. É deliberado — do contrário,
+adotar a ferramenta num repositório com história bloquearia todo commit até alguém
+limpar o passado. Para achar o que já está lá, use `gitsafety scan` na pasta inteira.
 
 E ele só dispara em **padrão conhecido de credencial** — `AKIA` seguido de 16
 maiúsculas é uma chave da AWS, não tem outra leitura. Nada de heurística de
@@ -192,12 +197,12 @@ vazamento. `--show-secrets` mostra o valor completo quando você realmente preci
 ## Todas as flags
 
 ```
+gitsafety install              instala o hook de pre-commit             ✅ disponível
 gitsafety scan [CAMINHO]       verifica arquivos                        ✅ disponível
+  --staged                     apenas os arquivos em stage              ✅ disponível
   --show-secrets               mostra o segredo completo                ✅ disponível
 gitsafety --version                                                     ✅ disponível
 
-gitsafety install              instala o hook de pre-commit             ⏳ em construção
-  --staged                     apenas os arquivos em stage              ⏳ em construção
   --history                    também o histórico do git                ⏳ em construção
   --config PATH                arquivo de config (padrão: .gitsafety.yml) ⏳ em construção
 ```

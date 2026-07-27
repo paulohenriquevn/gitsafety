@@ -16,7 +16,9 @@ from pathlib import Path
 import pytest
 
 
-def _git(repo: Path, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+def _git(
+    repo: Path, *args: str, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["git", "-C", str(repo), *args],
         capture_output=True,
@@ -68,6 +70,18 @@ def path_with_gitsafety() -> str:
 
     scripts = sysconfig.get_path("scripts")
     return f"{scripts}{os.pathsep}{os.environ.get('PATH', '')}"
+
+
+@pytest.fixture
+def gitsafety_on_path(monkeypatch, path_with_gitsafety: str) -> None:
+    """Põe o console script no `PATH` do processo de teste.
+
+    O ADR D8 faz `install_hook` recusar quando `gitsafety` não é resolvível — porque o
+    hook o invoca pelo PATH e falhar na instalação é muito melhor que falhar no meio de
+    um commit. Os testes de instalação precisam, portanto, montar essa pré-condição
+    explicitamente: sem ela estariam testando o próprio D8, não o que vem depois dele.
+    """
+    monkeypatch.setenv("PATH", path_with_gitsafety)
 
 
 @pytest.fixture

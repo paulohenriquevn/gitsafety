@@ -25,13 +25,7 @@ SECRET = "AKIAIOSFODNN7EXAMPLE"
 
 def test_parse_extracts_added_line_with_correct_number():
     # Arrange — hunk que insere na linha 3 do arquivo novo.
-    diff = (
-        "diff --git a/a.py b/a.py\n"
-        "--- a/a.py\n"
-        "+++ b/a.py\n"
-        "@@ -0,0 +3 @@\n"
-        f"+{SECRET}\n"
-    )
+    diff = f"diff --git a/a.py b/a.py\n--- a/a.py\n+++ b/a.py\n@@ -0,0 +3 @@\n+{SECRET}\n"
 
     # Act
     linhas = parse_added_lines(diff)
@@ -45,9 +39,7 @@ def test_parse_extracts_added_line_with_correct_number():
 
 def test_removed_lines_are_not_reported():
     """Caso negativo: apagar um segredo não pode acusar o usuário."""
-    diff = (
-        "diff --git a/a.py b/a.py\n--- a/a.py\n+++ b/a.py\n@@ -3 +0,0 @@\n" f"-{SECRET}\n"
-    )
+    diff = f"diff --git a/a.py b/a.py\n--- a/a.py\n+++ b/a.py\n@@ -3 +0,0 @@\n-{SECRET}\n"
     assert parse_added_lines(diff) == []
 
 
@@ -80,11 +72,7 @@ def test_multiple_hunks_each_restart_the_line_counter():
 
 def test_consecutive_added_lines_increment_the_counter():
     diff = (
-        "diff --git a/a.py b/a.py\n"
-        "--- a/a.py\n"
-        "+++ b/a.py\n"
-        "@@ -0,0 +5,3 @@\n"
-        "+um\n+dois\n+tres\n"
+        "diff --git a/a.py b/a.py\n--- a/a.py\n+++ b/a.py\n@@ -0,0 +5,3 @@\n+um\n+dois\n+tres\n"
     )
     assert [x.line for x in parse_added_lines(diff)] == [5, 6, 7]
 

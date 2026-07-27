@@ -119,16 +119,27 @@ def test_output_tells_the_user_to_revoke_the_key(dir_com_segredo, capsys):
 # --- Superfície da CLI ---------------------------------------------------------
 
 
-def test_help_does_not_advertise_flags_that_do_not_exist_yet(capsys):
-    """`--history` é M5 e `--staged` é M1 — documentar agora seria mentir."""
+def test_help_advertises_staged_now_that_it_exists(capsys):
+    """`--staged` passou a existir no M1 — o `--help` deve anunciá-la.
+
+    Este teste era `test_help_does_not_advertise_flags_that_do_not_exist_yet` no M0 e
+    assertava o oposto. A mudança é intencional, e o teste existe justamente para forçar
+    que ela seja consciente: alterar o contrato público sem tocar num teste vermelho é
+    como um contrato muda por acidente.
+    """
     # Act
     with pytest.raises(SystemExit):
         main(["scan", "--help"])
 
     # Assert
-    out = capsys.readouterr().out
-    assert "--history" not in out
-    assert "--staged" not in out
+    assert "--staged" in capsys.readouterr().out
+
+
+def test_help_still_does_not_advertise_history(capsys):
+    """`--history` continua sendo M5 — anunciá-la agora seria mentir."""
+    with pytest.raises(SystemExit):
+        main(["scan", "--help"])
+    assert "--history" not in capsys.readouterr().out
 
 
 def test_version_flag_prints_the_version(capsys):
