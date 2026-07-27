@@ -1,0 +1,34 @@
+# Peers clonados para estudo — material de referência, não código do projeto.
+# Reprodutíveis pelos comandos em knowledge-base/references-catalog.md.
+knowledge-base/references/
+
+# Artefatos de runtime dos ciclos
+knowledge-base/implementations/.progress-*.json
+ralph-loop.local.md
+.compaction-snapshots/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.tox/
+
+# Testes e cobertura
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Ferramentas
+.mypy_cache/
+.ruff_cache/
+
+# SO / editor
+.DS_Store
+*.swp
