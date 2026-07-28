@@ -22,15 +22,19 @@ import pytest
 
 RAIZ = Path(__file__).resolve().parents[2]
 
-#: Flags que o README cita e que pertencem ao **git**, não a nós.
-_DO_GIT = {"--no-verify", "--amend"}
+#: Flags que o README cita e que pertencem a **outras ferramentas**, não a nós.
+#:
+#: O README precisa mostrar comandos vizinhos — `git commit --no-verify` para a saída de
+#: emergência, `pip install --user pipx` para quem não tem o pipx. Sem esta lista, o teste
+#: acusaria o README de documentar flag inexistente por citar o ecossistema em volta.
+_DE_OUTRAS_FERRAMENTAS = {"--no-verify", "--amend", "--user"}
 #: Universais do argparse, que não precisam estar no README.
 _UNIVERSAIS = {"--help", "-h"}
 
 
 def _flags_do_readme() -> set[str]:
     texto = (RAIZ / "README.md").read_text(encoding="utf-8")
-    return set(re.findall(r"--[a-z][a-z-]+", texto)) - _DO_GIT - _UNIVERSAIS
+    return set(re.findall(r"--[a-z][a-z-]+", texto)) - _DE_OUTRAS_FERRAMENTAS - _UNIVERSAIS
 
 
 def _flags_da_cli() -> set[str]:

@@ -16,6 +16,20 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Security
 
+## [0.7.3] - 2026-07-28
+
+### Changed
+
+- **README reescrito para começar por um passo a passo de três passos.** Antes ele abria
+  com instalação e detalhe técnico, e quem chegava precisava descobrir sozinho que existem
+  três comandos e quando usar cada um
+- Nova seção **"Já commitei uma chave antes de instalar. E agora?"** — é a primeira pergunta
+  de quem adota a ferramenta num projeto que já existe
+- Tabela dizendo **qual comando usar quando**, em vez de listar flags e deixar o leitor
+  inferir
+- Os exemplos de saída passaram a ser transcrições do que a ferramenta imprime de verdade,
+  conferidas numa instalação limpa a partir do PyPI
+
 ## [0.7.2] - 2026-07-27
 
 ### Fixed

@@ -2,8 +2,8 @@
 
 **Não deixa você commitar uma chave de API.**
 
-Um comando para instalar, um YAML para ajustar. Funciona em repositório git, em
-pasta solta e em notebook Jupyter.
+Você instala uma vez, e a partir daí o `git commit` avisa antes de a credencial sair da sua
+máquina. Funciona em repositório git, em pasta solta e em notebook Jupyter.
 
 > **Status:** pré-1.0. Publicado no PyPI e funcional — instale e use. O `1.0.0` fica
 > reservado para depois de uso sustentado em trabalho real. Testes e revisão provam
@@ -11,49 +11,100 @@ pasta solta e em notebook Jupyter.
 
 ---
 
-## Instalação
+## Começando — 3 passos
 
-Requer Python 3.10 ou superior.
+Precisa de Python 3.10 ou mais novo. Nada de Docker, nada para compilar, nada para subir.
+
+### 1. Instale
 
 ```bash
-pipx install gitsafety     # recomendado — isolado, disponível no PATH
-pip install gitsafety      # dentro de um venv ou de um ambiente de notebook
+pipx install gitsafety
 ```
 
-Sem Docker, sem compilar nada, sem serviço para subir.
+Se não tiver o `pipx`: `python3 -m pip install --user pipx && python3 -m pipx ensurepath`.
 
-> **Prefira o `pipx`.** O hook chama `gitsafety` pelo PATH na hora do commit, e um venv que
-> você esqueceu de ativar faz **todo commit falhar** com `gitsafety: not found`. O `pipx`
-> deixa o comando disponível sempre. Se instalar num venv, lembre que quem commita precisa
-> estar nele — descobrimos isso instalando no nosso próprio repositório.
+<details>
+<summary>Prefere <code>pip</code> num ambiente virtual? Leia isto antes.</summary>
 
----
+`pip install gitsafety` funciona, mas o hook chama `gitsafety` pelo PATH **na hora do
+commit**. Se o ambiente virtual não estiver ativo naquele momento, **todo commit falha** com
+`gitsafety: not found`. O `pipx` deixa o comando disponível sempre.
 
-## Uso
+Descobrimos isso instalando no nosso próprio repositório — está registrado em
+[`knowledge-base/dogfood/`](knowledge-base/dogfood/).
+</details>
+
+### 2. Ligue no seu projeto
+
+Dentro da pasta do repositório, uma vez só:
 
 ```bash
-# 1. Instala o hook neste repositório — faça uma vez
 gitsafety install
-
-# 2. Pronto. O commit passa a ser verificado.
-git commit -m "novo cliente da API"
 ```
 
 ```console
-  src/client.py:18   openai-api-key   sk-p••••••••••••••••••••1a9f
-
-  Commit bloqueado: 1 segredo encontrado.
-  Revogue a chave antes de qualquer outra coisa.
+  hook instalado em /home/ana/meu-projeto/.git/hooks/pre-commit
+  A partir de agora o commit é verificado.
+  Emergência: git commit --no-verify
 ```
 
-Os outros dois usos:
+### 3. Trabalhe normalmente
+
+Não há passo 4. O `git commit` continua sendo `git commit` — a diferença aparece só quando
+há uma credencial no que você está enviando:
+
+```console
+$ git commit -m "adiciona cliente S3"
+
+  app.py:6   aws-access-key-id   AKIA••••••••••••MPLE
+
+  1 segredo encontrado.
+  Revogue a chave no provedor antes de qualquer outra coisa.
+```
+
+O commit **não** aconteceu. Tire a chave do código (use variável de ambiente, cofre, o que
+o seu time usar), commite de novo, e pronto.
+
+> **Por que "revogue a chave" e não "apague a linha".** Se a chave já saiu da sua máquina
+> alguma vez, apagá-la do código não a desativa. Quem a copiou continua com ela. Revogar no
+> provedor é a única ação que resolve de verdade — o resto é limpeza.
+
+---
+
+## Já commitei uma chave antes de instalar. E agora?
+
+O hook protege daqui para frente. Para olhar para trás:
 
 ```bash
-gitsafety scan              # verifica os arquivos da pasta atual
-gitsafety scan --history    # verifica o histórico do git (chave commitada no passado)
+gitsafety scan --history
 ```
 
-Emergência: `git commit --no-verify` passa por cima do hook.
+```console
+  antigo.py:1   postgres-connection-string   post•••••••••••••••••••••••••••••.com
+      6773ba6b  Ana  2026-07-28T08:35:13-03:00
+
+  1 segredo encontrado no histórico.
+  Revogue a chave no provedor antes de qualquer outra coisa.
+  Remover o arquivo agora NÃO apaga o segredo do histórico.
+```
+
+Ele mostra **quando a chave entrou e por quem** — é o que decide a urgência. E funciona
+mesmo que o arquivo já tenha sido apagado: o histórico do git lembra, e qualquer pessoa que
+clonou o repositório também.
+
+---
+
+## Os três comandos, e quando usar cada um
+
+| Comando | O que olha | Quando você usa |
+|---|---|---|
+| `gitsafety install` | — | Uma vez por repositório, no começo |
+| *(o hook, sozinho)* | o que você está commitando | Automático, a cada `git commit` |
+| `gitsafety scan` | os arquivos da pasta agora | Antes de abrir um PR, ou por curiosidade |
+| `gitsafety scan --history` | tudo que já foi commitado | Ao adotar num projeto que já existe |
+
+Emergência: `git commit --no-verify` passa por cima do hook. Existe porque bloquear alguém
+sem saída faz a pessoa desinstalar a ferramenta.
 
 ---
 
