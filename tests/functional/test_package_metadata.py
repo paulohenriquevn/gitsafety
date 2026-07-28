@@ -119,7 +119,7 @@ def test_python_requires_matches_the_readme(projeto):
 
 
 def test_declared_dependency_is_the_only_one(projeto):
-    """`docs/PRD.md § NFR-1` autoriza UMA dependência de runtime. Ela é o pyyaml.
+    """`docs/API.md § Dependências` autoriza UMA dependência de runtime: o pyyaml.
 
     Filtra os `extra ==` porque o que o usuário instala não inclui o ambiente de dev.
     """
@@ -202,3 +202,57 @@ def test_the_readme_has_no_leftover_pending_markers():
     ]
 
     assert not sobrando, f"marcadores de pendência no README: {sobrando}"
+
+
+# --- A referência citada pelo código precisa existir -----------------------------
+
+
+def _secoes_da_referencia() -> set[str]:
+    texto = (RAIZ / "docs" / "API.md").read_text(encoding="utf-8")
+    return {m.group(1).strip() for m in re.finditer(r"^#{2,3} (.+)$", texto, re.M)}
+
+
+def _citacoes_no_codigo() -> set[tuple[str, str]]:
+    """Toda citação de seção da referência em código, teste ou README, com sua origem."""
+    alvos = [
+        *(RAIZ / "src").rglob("*.py"),
+        *(RAIZ / "tests").rglob("*.py"),
+        RAIZ / "README.md",
+    ]
+    achadas = set()
+    for arquivo in alvos:
+        for m in re.finditer(
+            r"docs/API\.md`? § ([^`\n:,.)]+)", arquivo.read_text(encoding="utf-8")
+        ):
+            achadas.add((str(arquivo.relative_to(RAIZ)), m.group(1).strip()))
+    return achadas
+
+
+def test_every_reference_citation_resolves_to_a_real_section():
+    """Citação que não resolve é a mesma falha que o `⏳ em construção` de flag entregue.
+
+    O código aponta para seções da referência em mais de vinte arquivos. Renomear uma
+    delas quebraria todas essas citações em silêncio — o leitor procura a seção, não acha,
+    e passa a desconfiar das outras também. Este teste faz o rename doer na hora.
+    """
+    secoes = _secoes_da_referencia()
+
+    orfas = sorted(
+        f"{origem} -> § {alvo}" for origem, alvo in _citacoes_no_codigo() if alvo not in secoes
+    )
+
+    assert not orfas, f"citações que não resolvem em docs/API.md: {orfas}"
+
+
+def test_the_reference_declares_the_version_that_is_installed(projeto):
+    """A referência declara a versão que documenta — e ela precisa ser a atual.
+
+    Uma referência que diz "versão 0.7.3" sobre um pacote 0.9.0 documenta o passado sem
+    avisar. O leitor não tem como saber quais contratos mudaram desde então.
+    """
+    texto = (RAIZ / "docs" / "API.md").read_text(encoding="utf-8")
+
+    declarada = re.search(r"referência da versão \*\*([\d.]+)\*\*", texto)
+
+    assert declarada, "docs/API.md não declara a versão que documenta"
+    assert declarada.group(1) == projeto["version"]

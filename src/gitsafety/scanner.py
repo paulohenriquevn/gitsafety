@@ -26,7 +26,7 @@ from gitsafety.walker import SkippedFile, walk
 if TYPE_CHECKING:  # evita ciclo em runtime; `config` importa deste módulo
     from gitsafety.config import Config
 
-#: Marcador de supressão por linha (`docs/PRD.md § FR-14`).
+#: Marcador de supressão por linha (`docs/API.md § Supressão`).
 #:
 #: Procuramos a **substring**, sem exigir o caractere de comentário: linguagens usam
 #: `#`, `//`, `--`, `;`, `%`. Exigir um deles obrigaria a saber a linguagem do arquivo, e

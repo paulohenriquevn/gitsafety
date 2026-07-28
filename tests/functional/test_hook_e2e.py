@@ -48,7 +48,7 @@ def test_clean_commit_succeeds_with_the_hook_installed(tmp_git_repo, stage, git_
 
 @pytest.mark.usefixtures("gitsafety_on_path")
 def test_no_verify_bypasses_the_hook(tmp_git_repo, stage, git_commit):
-    """O bypass é nativo do git e não deve ser combatido (`docs/PRD.md § 6.1`)."""
+    """O bypass é nativo do git e não deve ser combatido (`docs/API.md § Comandos`)."""
     # Arrange
     install_hook(tmp_git_repo)
     stage("config.py", f'API_KEY = "{SECRET}"\n')
@@ -83,7 +83,7 @@ def test_secret_only_on_disk_does_not_block_the_commit(tmp_git_repo, stage, git_
 def test_blocked_commit_shows_the_masked_secret_not_the_real_one(
     tmp_git_repo, stage, git_commit
 ):
-    """A saída do hook chega ao terminal do usuário — e não pode vazar (`PRD § NFR-4`).
+    """A saída do hook chega ao terminal — e não pode vazar (`docs/API.md § Mascaramento`).
 
     Este é o teste que impede o produto de virar o problema que ele resolve: o segredo
     aparece no terminal, no histórico do shell e, muitas vezes, no log do CI.
@@ -103,7 +103,7 @@ def test_blocked_commit_shows_the_masked_secret_not_the_real_one(
 
 @pytest.mark.usefixtures("gitsafety_on_path")
 def test_blocked_commit_tells_the_user_to_revoke(tmp_git_repo, stage, git_commit):
-    """`PRD § FR-19`: remover a linha não desfaz a exposição."""
+    """``docs/API.md` § Formato de saída`: remover a linha não desfaz a exposição."""
     install_hook(tmp_git_repo)
     stage("config.py", f'API_KEY = "{SECRET}"\n')
     saida = (lambda r: r.stdout + r.stderr)(git_commit("adiciona config"))

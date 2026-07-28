@@ -106,6 +106,9 @@ clonou o repositório também.
 Emergência: `git commit --no-verify` passa por cima do hook. Existe porque bloquear alguém
 sem saída faz a pessoa desinstalar a ferramenta.
 
+Este README é o guia de uso. A referência completa da CLI está em
+[`docs/API.md`](docs/API.md).
+
 ---
 
 ## Por que ele não enche o saco
@@ -366,6 +369,9 @@ disco.
 Esta lista é a lista inteira. `gitsafety scan --help` mostra exatamente estas flags, e um
 teste da suíte compara as duas nas duas direções a cada execução — flag documentada que não
 existe, e flag que existe sem documentação.
+
+O contrato completo — cada código de saída, cada campo da saída, cada chave de configuração
+e o que acontece quando ela está errada — está em [`docs/API.md`](docs/API.md).
 
 ---
 

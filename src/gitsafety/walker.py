@@ -24,8 +24,8 @@ from pathlib import Path
 from gitsafety._binary_extensions import BINARY_EXTENSIONS
 from gitsafety.errors import PathNotFoundError
 
-#: Limite de tamanho, em bytes. Fixo — sem flag, per `docs/PRD.md § NFR-3` (teto de 4
-#: flags) e ADR D4 (nada configurável sem caso de uso). O gitleaks oferece
+#: Limite de tamanho, em bytes. Fixo — sem flag, per `docs/API.md § Superfície da CLI`
+#: (teto de 4 flags) e ADR D4 (nada configurável sem caso de uso). O gitleaks oferece
 #: `--max-target-megabytes` (`cmd/root.go:292`) e o deixa **desligado** por padrão;
 #: nós preferimos um default sensato a um knob desligado que ninguém liga.
 MAX_FILE_BYTES = 1_000_000

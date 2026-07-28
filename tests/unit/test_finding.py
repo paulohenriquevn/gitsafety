@@ -1,6 +1,6 @@
 """T2.2 — Finding e mascaramento do segredo.
 
-`docs/PRD.md § NFR-4` exige que o segredo apareça mascarado por padrão em toda saída:
+`docs/API.md § Mascaramento` exige que o segredo apareça mascarado por padrão em toda saída:
 o relatório de um detector de segredos não pode ser o próximo vazamento. O
 mascaramento vive no objeto que carrega o segredo, e não no renderizador, para que
 nenhum caminho de saída futuro (hook do M1, histórico do M5) possa esquecer de aplicá-lo.
@@ -70,7 +70,7 @@ def test_finding_exposes_the_masked_secret():
 
 
 def test_finding_still_carries_the_raw_secret_for_show_secrets():
-    """`--show-secrets` (PRD FR-16) precisa do valor íntegro.
+    """`--show-secrets` (`docs/API.md` § Mascaramento) precisa do valor íntegro.
 
     Mascarar destruindo o original tornaria a flag impossível de implementar; o
     contrato é que o mascarado seja o DEFAULT, não que o original desapareça.

@@ -4,7 +4,7 @@
 (`rules/architecture.md § 1`). A regra de negócio inteira vive em `scanner`; aqui só
 se traduz resultado em texto e em código de processo.
 
-`argparse` da stdlib, não `click` (ADR D5): `docs/PRD.md § NFR-1` autoriza uma
+`argparse` da stdlib, não `click` (ADR D5): `docs/API.md § Dependências` autoriza uma
 dependência externa e ela está reservada ao parser de YAML do M3.
 """
 
@@ -82,7 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
 def render(result: ScanResult, *, show_secrets: bool) -> str:
     """Formata o resultado para leitura humana.
 
-    O segredo sai **mascarado por padrão** (`docs/PRD.md § NFR-4`) — o valor íntegro
+    O segredo sai **mascarado por padrão** (`docs/API.md § Mascaramento`) — o valor íntegro
     só aparece sob pedido explícito. E a saída sempre instrui a revogar a chave
     (`FR-19`): apagar a linha não desfaz a exposição, e quem não souber disso vai
     "resolver" o incidente deixando a credencial ativa.

@@ -1,4 +1,4 @@
-"""T3.2 — orçamento de latência do hook (`docs/PRD.md § NFR-2`).
+"""T3.2 — orçamento de latência do hook (`docs/API.md § Superfície da CLI`).
 
 O `NFR-2` promete que a verificação "não deve ser perceptível no fluxo normal (alvo:
 < 1 s para um commit típico)". Sem medir o caminho completo — invocação do processo
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from benchmarks.bench_hook import measure_pair
 
-#: `docs/PRD.md § NFR-2`.
+#: `docs/API.md § Superfície da CLI`.
 BUDGET_SECONDS = 1.0
 
 #: Um commit típico toca poucas dezenas de arquivos.

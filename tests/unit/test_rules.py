@@ -68,7 +68,7 @@ def test_aws_rule_does_not_match_a_longer_alphanumeric_run():
 
     Sem delimitação, `AKIA[0-9A-Z]{16}` casaria o prefixo de uma cadeia maior e
     reportaria um segredo que não existe — falso positivo, que segundo
-    `docs/PRD.md § 4` é o que faz o time desinstalar a ferramenta.
+    `docs/API.md § Superfície da CLI` é o que faz o time desinstalar a ferramenta.
     """
     # Arrange
     texto = "AKIAIOSFODNN7EXAMPLEEXTRA"

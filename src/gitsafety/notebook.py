@@ -10,7 +10,7 @@ reportadas eram do JSON, e um notebook aberto no Jupyter não tem linha 53. O gi
 a mesma lacuna e a resolve na apresentação (`detect/utils.go:41-43`, acrescentando
 `?plain=1` ao link), o que só serve a quem escreve links; nós escrevemos caminhos locais.
 
-`json` da stdlib, não `nbformat`: `.ipynb` é JSON, o `docs/PRD.md § NFR-1` já gastou sua
+`json` da stdlib, não `nbformat`: `.ipynb` é JSON, o `docs/API.md § Dependências` já gastou sua
 única dependência no M3, e a validação de esquema do `nbformat` é justamente o que **não**
 queremos — um notebook que ele rejeita ainda pode conter a credencial.
 """

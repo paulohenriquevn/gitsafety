@@ -1,6 +1,6 @@
 """Ocorrência de uma regra em um arquivo, e o mascaramento do segredo.
 
-`docs/PRD.md § NFR-4`: o segredo aparece mascarado por padrão em toda saída. O
+`docs/API.md § Mascaramento`: o segredo aparece mascarado por padrão em toda saída. O
 mascaramento mora aqui, junto do dado que carrega o segredo, e não no renderizador —
 assim nenhum caminho de saída futuro (hook do M1, histórico do M5) pode esquecer de
 aplicá-lo. Esquecer de mascarar em um caminho novo transformaria o relatório de
@@ -40,7 +40,7 @@ def mask(secret: str, *, keep: int = DEFAULT_KEEP) -> str:
 class Finding:
     """Uma ocorrência de regra em um arquivo.
 
-    Guarda o segredo íntegro porque `--show-secrets` (`docs/PRD.md § FR-16`) precisa
+    Guarda o segredo íntegro porque `--show-secrets` (`docs/API.md § Mascaramento`) precisa
     dele; o contrato é que o mascarado seja o **default** de exibição, não que o
     original seja destruído.
     """

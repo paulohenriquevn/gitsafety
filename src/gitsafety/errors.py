@@ -15,7 +15,7 @@ from enum import IntEnum
 
 
 class ExitCode(IntEnum):
-    """Contrato público de código de saída — `docs/PRD.md § FR-18` e README.
+    """Contrato público de código de saída — `docs/API.md § Códigos de saída` e README.
 
     Não é configurável por flag, ao contrário do gitleaks
     (`cmd/detect.go:65`): aquela opção existe para acomodar CI legado que não temos,

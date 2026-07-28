@@ -1,8 +1,8 @@
 """T3.1 — métrica de falso positivo contra corpus limpo (ADR D7).
 
-`ROADMAP.md § M2` DoD nº 3 e `docs/PRD.md § 8`: falso positivo é a métrica que decide se
-a ferramenta é tolerável. Um catálogo que acusa código legítimo é desinstalado na segunda
-semana, e ferramenta desinstalada tem taxa de detecção zero.
+`ROADMAP.md § M2` DoD nº 3 e `docs/API.md § Limitações`: falso positivo é a métrica
+que decide se a ferramenta é tolerável. Um catálogo que acusa código legítimo é
+desinstalado na segunda semana, e ferramenta desinstalada tem taxa de detecção zero.
 """
 
 from __future__ import annotations

@@ -125,7 +125,7 @@ def test_oversized_notebook_appears_in_skipped(tmp_path):
 
 
 def test_secret_only_in_saved_output_is_found(tmp_path):
-    """O vetor que o `docs/PRD.md § 2` nomeia: a chave sobrevive no `print`."""
+    """O vetor que o `docs/API.md § Notebooks Jupyter` nomeia: a chave sobrevive no `print`."""
     nb = tmp_path / "a.ipynb"
     _write_nb(nb, [_code(["print(os.environ)\n"], [_stream(f"{{'AWS': '{AKIA}'}}\n")])])
 

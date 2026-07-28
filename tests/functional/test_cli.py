@@ -32,7 +32,7 @@ def dir_com_segredo(tmp_path):
     return tmp_path
 
 
-# --- Exit codes (PRD FR-18) ----------------------------------------------------
+# --- Exit codes (`docs/API.md` § Códigos de saída) ------------------------------
 
 
 def test_exit_code_is_zero_when_nothing_is_found(dir_limpo):
@@ -57,7 +57,7 @@ def test_error_message_names_the_missing_path(tmp_path, capsys):
     assert "fantasma" in err
 
 
-# --- Mascaramento (PRD NFR-4) --------------------------------------------------
+# --- Mascaramento (`docs/API.md` § Mascaramento) --------------------------------
 
 
 def test_output_masks_the_secret_by_default(dir_com_segredo, capsys):
@@ -79,7 +79,7 @@ def test_show_secrets_flag_reveals_the_full_value(dir_com_segredo, capsys):
     assert SECRET in capsys.readouterr().out
 
 
-# --- Forma da saída (PRD FR-15) ------------------------------------------------
+# --- Forma da saída (`docs/API.md` § Formato de saída) --------------------------
 
 
 def test_output_reports_file_line_and_rule(dir_com_segredo, capsys):
@@ -113,7 +113,7 @@ def test_clean_scan_does_not_mention_skipped_files_when_there_are_none(dir_limpo
 
 
 def test_output_tells_the_user_to_revoke_the_key(dir_com_segredo, capsys):
-    """PRD FR-19: remover a linha não desfaz a exposição."""
+    """`docs/API.md` § Formato de saída: remover a linha não desfaz a exposição."""
     main(["scan", str(dir_com_segredo)])
     assert "revogue" in capsys.readouterr().out.lower()
 
@@ -160,7 +160,7 @@ def test_version_flag_prints_the_version(capsys):
 
 
 def test_scan_without_path_defaults_to_current_directory(dir_limpo, monkeypatch):
-    """PRD FR-3: sem argumento posicional, o alvo é o diretório atual."""
+    """`docs/API.md` § `gitsafety scan`: sem posicional, o alvo é o diretório atual."""
     # Arrange
     monkeypatch.chdir(dir_limpo)
 
@@ -214,7 +214,7 @@ def test_help_now_advertises_config(capsys):
 
 
 def test_scan_has_at_most_four_flags():
-    """`docs/PRD.md § NFR-3`: teto de 4 flags no `scan`.
+    """`docs/API.md § Superfície da CLI`: teto de 4 flags no `scan`.
 
     Conta as opções do subparser, descontando o `--help` que o argparse adiciona.
     """

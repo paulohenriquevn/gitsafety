@@ -16,6 +16,45 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Security
 
+## [0.7.4] - 2026-07-28
+
+### Added
+
+- **`docs/API.md` — referência da CLI.** Contrato completo em um lugar: os três comandos,
+  as quatro flags, os três alvos, os códigos de saída, o formato de saída (incluindo a
+  linha de commit do `--history` e o caminho com célula do notebook), o mascaramento, as
+  três chaves de configuração e o que acontece quando cada uma está errada, os três níveis
+  de supressão, e as limitações conhecidas (#7)
+- A referência declara **o que a ferramenta não faz** e aponta gitleaks e trufflehog para
+  quem precisa de auditoria forense — escopo negativo é decisão, não omissão (#7)
+- Uso a partir de Python documentado **com o aviso de que não há promessa de estabilidade
+  até a 1.0**. O contrato estável é a CLI; quem importa os módulos hoje deve fixar a
+  versão (#7)
+- Dois testes que travam a referência ao código: um verifica que **toda citação
+  `docs/API.md § …` feita em código, teste ou README resolve para uma seção que existe**;
+  o outro, que a **versão declarada na referência é a versão do pacote**. Ambos foram
+  verificados falhando com o defeito presente antes de entrarem (#7)
+
+### Changed
+
+- README passa a apontar para a referência em dois lugares — depois da tabela de comandos e
+  depois da lista de flags. Ele continua sendo o guia de uso; o contrato mora ao lado (#7)
+- As 30 citações de requisito em código de produção e em testes passaram a apontar para a
+  seção da referência que enuncia o mesmo contrato, no lugar do identificador `FR-XX`. Um
+  `FR-18` exigia abrir outro documento e procurar; `docs/API.md § Códigos de saída` diz o
+  que é (#7)
+- O contrato da linha final da saída ("revogue a chave no provedor") passou a estar
+  **declarado** na referência. Um teste já o afirmava; a documentação, não (#7)
+
+### Removed
+
+- **`docs/PRD.md`.** Era um documento de requisitos escrito antes da primeira linha de
+  código, com identificadores `FR-XX`/`NFR-XX` que só faziam sentido para quem tinha o
+  documento aberto ao lado. O produto existe e está publicado; o que falta é dizer o que
+  ele faz, não o que se pretendia que fizesse (#7)
+- As menções ao PRD em CHANGELOG, ROADMAP e `knowledge-base/` **não** foram reescritas: são
+  registro histórico do que se decidiu quando, e reescrevê-las falsificaria o registro
+
 ## [0.7.3] - 2026-07-28
 
 ### Changed

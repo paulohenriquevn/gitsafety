@@ -24,7 +24,7 @@ def _write(tmp_path, conteudo: str):
 
 
 def test_missing_config_file_returns_empty_config(tmp_path):
-    """`docs/PRD.md § FR-22`: a ferramenta é útil com zero configuração."""
+    """`docs/API.md § Configuração`: a ferramenta é útil com zero configuração."""
     cfg = load_config(start=tmp_path)
     assert cfg == Config()
 

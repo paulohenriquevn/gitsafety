@@ -14,7 +14,7 @@ from gitsafety.errors import ExitCode, GitsafetyError, PathNotFoundError, UsageE
 
 
 def test_exit_codes_match_the_documented_contract():
-    # Arrange / Act / Assert — os três valores são contrato público (README + PRD FR-18).
+    # Arrange / Act / Assert — contrato público (README + `docs/API.md` § Códigos de saída).
     assert ExitCode.SUCCESS == 0
     assert ExitCode.SECRETS_FOUND == 1
     assert ExitCode.USAGE_ERROR == 2

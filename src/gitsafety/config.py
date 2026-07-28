@@ -31,7 +31,7 @@ from gitsafety.patterns import Rule, has_free_quantifier, has_nested_quantifier
 
 CONFIG_FILENAME = ".gitsafety.yml"
 
-#: As três chaves do `docs/PRD.md § FR-20`. Qualquer outra é erro (ADR D4).
+#: As três chaves do `docs/API.md § Configuração`. Qualquer outra é erro (ADR D4).
 KNOWN_KEYS = ("ignore", "allow", "rules")
 
 #: Sonda **progressiva**: comprimentos crescentes, com aborto ao primeiro que exceder o

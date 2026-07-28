@@ -235,8 +235,8 @@ def rewritten_commits(cwd: Path) -> int:
     revisão do mesmo repositório dar respostas diferentes em máquinas diferentes.
 
     Contar custa 8 ms e permite avisar sobre a lacuna exatamente quando ela existe, sem
-    gastar uma flag (`docs/PRD.md § NFR-3` limita o `scan` a quatro) nem prometer o que não
-    entregamos.
+    gastar uma flag (`docs/API.md § Superfície da CLI` limita o `scan` a quatro) nem
+    prometer o que não entregamos.
     """
     try:
         saida = run_git(["rev-list", "--reflog", "--not", "--all", "--count"], cwd=cwd)

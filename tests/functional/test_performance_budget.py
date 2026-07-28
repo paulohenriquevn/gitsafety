@@ -1,8 +1,8 @@
 """T3.3 — orçamento de latência da varredura.
 
 O M1 amarra a varredura ao `git commit`, e a partir dali latência vira experiência do
-usuário (`docs/PRD.md § NFR-2`). Medir agora, antes de existir a pressão do hook, cria
-a linha de base contra a qual o M1 será comparado. Sem número no M0, "ficou mais
+usuário (`docs/API.md § Superfície da CLI`). Medir agora, antes da pressão do hook,
+cria a linha de base contra a qual o M1 será comparado. Sem número no M0, "ficou mais
 lento" no M1 é opinião.
 
 O orçamento é **absoluto e folgado** de propósito: pega regressão de ordem de

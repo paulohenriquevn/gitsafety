@@ -14,3 +14,13 @@ ignore:
   - "knowledge-base/**"
   # Os peers clonados, que são código de terceiros com seus próprios exemplos.
   - "knowledge-base/references/**"
+
+allow:
+  # A chave que a própria AWS publica na documentação dela como exemplo. Aparece no
+  # README e em `docs/API.md` porque é o valor canônico para mostrar como o `allow:`
+  # funciona — e o hook, corretamente, a detecta.
+  #
+  # `allow:` em vez de ignorar `docs/**`: ignorar a pasta inteira faria uma chave de
+  # verdade escrita num guia passar em silêncio. O que é inofensivo aqui é este valor,
+  # não o diretório.
+  - "AKIAIOSFODNN7EXAMPLE"
