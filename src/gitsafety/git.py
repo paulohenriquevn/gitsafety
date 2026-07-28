@@ -16,7 +16,12 @@ import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
-from gitsafety.errors import GitCommandError, GitUnavailableError, NotAGitRepositoryError
+from gitsafety.errors import (
+    GitCommandError,
+    GitUnavailableError,
+    NotAGitRepositoryError,
+    PathNotFoundError,
+)
 
 #: `git` costuma responder em milissegundos; um repositório patológico pode demorar mais.
 #: O teto existe para que um git travado não pendure o commit do usuário indefinidamente.
@@ -30,8 +35,13 @@ _NOT_A_REPO_MARKERS = (
 )
 
 
-def run_git(args: Sequence[str], *, cwd: Path) -> str:
+def run_git(args: Sequence[str], *, cwd: Path, strip: bool = True) -> str:
     """Executa `git <args>` em `cwd` e devolve o stdout sem espaços nas pontas.
+
+    `strip=False` para saída separada por NUL (`git ls-files -z`), onde o primeiro
+    caminho pode legitimamente começar com espaço. Um arquivo chamado `" prod.env"`
+    existe, e comê-lo pela borda o tiraria da varredura — falso negativo silencioso,
+    que é o pior resultado que este produto pode dar.
 
     Traduz três modos de falha distintos, que o código óbvio confunde num só:
 
@@ -58,6 +68,11 @@ def run_git(args: Sequence[str], *, cwd: Path) -> str:
             timeout=_GIT_TIMEOUT_SEC,
         )
     except FileNotFoundError as exc:
+        # O subprocess levanta o MESMO erro para "binário ausente" e "cwd inexistente".
+        # Confundi-los manda o usuário instalar o git que ele já tem, em vez de conferir
+        # o caminho que digitou (`rules/error-handling.md § 2` — erro tipado e claro).
+        if not Path(cwd).is_dir():
+            raise PathNotFoundError(str(cwd)) from exc
         raise GitUnavailableError("o programa 'git' não foi encontrado no PATH") from exc
     except subprocess.TimeoutExpired as exc:
         raise GitCommandError(
@@ -72,7 +87,7 @@ def run_git(args: Sequence[str], *, cwd: Path) -> str:
             raise NotAGitRepositoryError(str(cwd))
         raise GitCommandError(" ".join(args), f"código {result.returncode}: {stderr}")
 
-    return result.stdout.strip()
+    return result.stdout.strip() if strip else result.stdout
 
 
 def is_git_repository(path: Path) -> bool:

@@ -204,7 +204,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         # A config é carregada ANTES da varredura: um erro nela precisa aparecer
         # imediatamente, e não depois de percorrer mil arquivos.
-        cfg = load_config(Path(args.config) if args.config else None)
+        #
+        # `start` é o ALVO, não o diretório corrente: `find_config` já declara que a
+        # config pertence ao repositório, e sem isto ela pertencia ao repositório de
+        # quem chamou. `gitsafety scan /outro/projeto` aplicava o `allow:` daqui lá —
+        # falso negativo por ambiente, que é o pior modo de falha deste produto.
+        #
+        # `--staged` e `--history` continuam em `cwd` porque ali o alvo É o repositório
+        # corrente; é assim que o hook invoca.
+        inicio = None if (args.staged or args.history) else Path(args.path)
+        cfg = load_config(Path(args.config) if args.config else None, start=inicio)
         if args.history:
             achados = scan_history(Path.cwd(), config=cfg)
             print(

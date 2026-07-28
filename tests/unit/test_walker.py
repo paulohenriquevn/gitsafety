@@ -14,8 +14,9 @@ from __future__ import annotations
 
 import pytest
 
-from gitsafety.errors import PathNotFoundError
+from gitsafety.errors import GitUnavailableError, PathNotFoundError
 from gitsafety.walker import MAX_FILE_BYTES, SkipReason, is_binary_path, walk
+from tests.conftest import _git
 
 
 def test_walk_returns_text_files_to_scan(tmp_path):
@@ -174,3 +175,185 @@ def test_walk_raises_typed_error_when_root_does_not_exist(tmp_path):
     with pytest.raises(PathNotFoundError) as exc:
         walk(fantasma)
     assert "inexistente" in str(exc.value)
+
+
+# --- O que o git ignora, a gente ignora (#8) -------------------------------------
+#
+# Encontrado instalando a ferramenta num monorepo real: 197 arquivos rastreados,
+# 20.479 percorridos. O resto era `node_modules/` — código de terceiros que quem roda
+# o scan não escreveu, não controla e não pode corrigir. Achado ali é falso positivo
+# por definição, e falso positivo é o que faz desinstalarem a ferramenta.
+
+
+def test_walk_skips_what_gitignore_excludes(tmp_git_repo):
+    """O caso que motivou a correção: dependência instalada não é código do usuário."""
+    (tmp_git_repo / ".gitignore").write_text("node_modules/\n", encoding="utf-8")
+    (tmp_git_repo / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    (tmp_git_repo / "node_modules" / "pacote").mkdir(parents=True)
+    (tmp_git_repo / "node_modules" / "pacote" / "index.js").write_text(
+        "const k = 'AKIAIOSFODNN7EXAMPLE'\n", encoding="utf-8"
+    )
+
+    files, _ = walk(tmp_git_repo)
+
+    nomes = {p.name for p in files}
+    assert "app.py" in nomes
+    assert "index.js" not in nomes, "arquivo gitignorado entrou na varredura"
+
+
+def test_walk_does_not_read_the_git_directory_itself(tmp_git_repo):
+    """`.git/` é o banco de dados do git, não código — e nunca foi escrito por ninguém."""
+    (tmp_git_repo / "app.py").write_text("print('ok')\n", encoding="utf-8")
+
+    files, skipped = walk(tmp_git_repo)
+
+    tudo = [p.as_posix() for p in files] + [s.path.as_posix() for s in skipped]
+    assert not [p for p in tudo if "/.git/" in p or p.startswith(".git/")]
+
+
+def test_walk_still_sees_a_file_that_was_force_added(tmp_git_repo, stage):
+    """Rastreado vence o `.gitignore`.
+
+    `git add -f` sobre um caminho ignorado é decisão deliberada de versionar aquilo.
+    O arquivo passa a fazer parte do repositório, e o que está no repositório é
+    exatamente o que pode vazar.
+    """
+    (tmp_git_repo / ".gitignore").write_text("segredos/\n", encoding="utf-8")
+    alvo = tmp_git_repo / "segredos" / "prod.env"
+    alvo.parent.mkdir()
+    alvo.write_text("AWS=AKIAIOSFODNN7EXAMPLE\n", encoding="utf-8")
+    _git(tmp_git_repo, "add", "-f", "segredos/prod.env")
+
+    files, _ = walk(tmp_git_repo)
+
+    assert alvo in files
+
+
+def test_walk_sees_a_new_file_that_was_never_added(tmp_git_repo):
+    """Arquivo novo e não rastreado é o caso mais comum do `scan` — não pode sumir.
+
+    Se o conjunto viesse só de `--cached`, o arquivo que você acabou de escrever (e é
+    justamente onde a chave recém-colada está) não seria varrido.
+    """
+    novo = tmp_git_repo / "acabei_de_criar.py"
+    novo.write_text("k = 'AKIAIOSFODNN7EXAMPLE'\n", encoding="utf-8")
+
+    files, _ = walk(tmp_git_repo)
+
+    assert novo in files
+
+
+def test_walk_outside_a_git_repository_is_unchanged(tmp_path):
+    """Pasta solta continua funcionando — o README promete `scan` fora de repo."""
+    (tmp_path / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "outro.py").write_text("print('ok')\n", encoding="utf-8")
+
+    files, _ = walk(tmp_path)
+
+    assert {p.name for p in files} == {"app.py", "outro.py"}
+
+
+def test_walk_falls_back_to_the_filesystem_when_git_is_missing(tmp_git_repo, monkeypatch):
+    """Sem `git` no PATH, varre a mais — nunca a menos.
+
+    A referência diz que o git só é exigido por `--staged` e `--history`; o scan de
+    disco não pode passar a exigi-lo. E a direção do fallback importa: varrer demais
+    gera ruído, varrer de menos esconde credencial. Um é irritante, o outro é o
+    fracasso do produto.
+    """
+    (tmp_git_repo / ".gitignore").write_text("node_modules/\n", encoding="utf-8")
+    (tmp_git_repo / "node_modules").mkdir()
+    (tmp_git_repo / "node_modules" / "x.js").write_text("k=1\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "gitsafety.walker.run_git",
+        lambda *a, **k: (_ for _ in ()).throw(GitUnavailableError("sem git")),
+    )
+    files, _ = walk(tmp_git_repo)
+
+    assert "x.js" in {p.name for p in files}
+
+
+def test_walk_of_a_subdirectory_stays_inside_it(tmp_git_repo):
+    """`gitsafety scan src/` não pode devolver achado de fora de `src/`."""
+    (tmp_git_repo / "src").mkdir()
+    (tmp_git_repo / "src" / "dentro.py").write_text("print(1)\n", encoding="utf-8")
+    (tmp_git_repo / "fora.py").write_text("print(2)\n", encoding="utf-8")
+
+    files, _ = walk(tmp_git_repo / "src")
+
+    assert {p.name for p in files} == {"dentro.py"}
+
+
+def test_walk_of_a_single_file_ignores_gitignore(tmp_git_repo):
+    """Apontar para um arquivo é pedido explícito — o usuário já decidiu o alvo."""
+    (tmp_git_repo / ".gitignore").write_text("*.env\n", encoding="utf-8")
+    alvo = tmp_git_repo / "prod.env"
+    alvo.write_text("AWS=AKIAIOSFODNN7EXAMPLE\n", encoding="utf-8")
+
+    files, _ = walk(alvo)
+
+    assert files == [alvo]
+
+
+def test_the_users_ignore_still_applies_on_top_of_gitignore(tmp_git_repo):
+    """As duas listas somam; a do `.gitsafety.yml` não foi substituída."""
+    (tmp_git_repo / ".gitignore").write_text("node_modules/\n", encoding="utf-8")
+    (tmp_git_repo / "fixtures").mkdir()
+    (tmp_git_repo / "fixtures" / "exemplo.py").write_text("k=1\n", encoding="utf-8")
+    (tmp_git_repo / "app.py").write_text("print(1)\n", encoding="utf-8")
+
+    files, _ = walk(tmp_git_repo, ignore=("fixtures/**",))
+
+    assert {p.name for p in files} == {"app.py", ".gitignore"}
+
+
+def test_an_empty_repository_does_not_fall_back_to_the_filesystem(tmp_git_repo):
+    """Lista vazia é resposta do git, não ausência de resposta.
+
+    `_do_git` devolve `[]` num repositório recém-criado e `None` quando não deu para
+    perguntar. Tratar os dois como a mesma coisa faria o repositório vazio cair no
+    `rglob` e varrer os `.git/hooks/*.sample` — os únicos arquivos que sobram ali.
+    """
+    files, skipped = walk(tmp_git_repo)
+
+    assert files == []
+    assert skipped == []
+
+
+# --- O glob do ignore é relativo à raiz do repositório (#10) ---------------------
+
+
+def test_ignore_applies_the_same_from_the_root_and_from_a_subdirectory(tmp_git_repo):
+    """O mesmo `ignore:` precisa valer nos dois níveis.
+
+    Testar só a raiz deixa o defeito invisível — era o caso comum, e por isso ele passou
+    despercebido. O par é o teste: `scan .` já funcionava; `scan src/` não.
+    """
+    (tmp_git_repo / "src").mkdir()
+    (tmp_git_repo / "src" / "fixtures").mkdir()
+    (tmp_git_repo / "src" / "fixtures" / "exemplo.py").write_text("k=1\n", encoding="utf-8")
+    (tmp_git_repo / "src" / "app.py").write_text("print(1)\n", encoding="utf-8")
+
+    glob = ("src/fixtures/**",)
+
+    da_raiz, _ = walk(tmp_git_repo, ignore=glob)
+    do_subdir, _ = walk(tmp_git_repo / "src", ignore=glob)
+
+    assert "exemplo.py" not in {p.name for p in da_raiz}
+    assert "exemplo.py" not in {p.name for p in do_subdir}, (
+        "o ignore foi desconsiderado ao varrer o subdiretório"
+    )
+    assert "app.py" in {p.name for p in do_subdir}
+
+
+def test_ignore_outside_a_git_repository_is_relative_to_the_scan_target(tmp_path):
+    """Sem repositório não há raiz — o alvo do scan é a única referência possível."""
+    (tmp_path / "fixtures").mkdir()
+    (tmp_path / "fixtures" / "exemplo.py").write_text("k=1\n", encoding="utf-8")
+    (tmp_path / "app.py").write_text("print(1)\n", encoding="utf-8")
+
+    files, _ = walk(tmp_path, ignore=("fixtures/**",))
+
+    assert {p.name for p in files} == {"app.py"}

@@ -8,6 +8,14 @@ ignore:
   # O catálogo declara `true_positives` para cada regra — são os exemplos que o CI usa
   # para provar que a regra funciona. Sem eles a suíte não teria como falhar.
   - "src/gitsafety/catalog.py"
+  # `patterns.py` cita os cabeçalhos de chave privada ao explicar por que a construção
+  # `literal_marker` existe. São exemplos na documentação da função, não credenciais.
+  #
+  # Por que `ignore:` do arquivo e não `allow:` do valor: aqueles cabeçalhos SÃO o
+  # indicador que a regra procura. Um `allow:` sobre eles cegaria a detecção de chave
+  # privada no repositório inteiro — trocaria dois falsos positivos por um falso
+  # negativo grave. Pelo mesmo motivo este comentário não os transcreve.
+  - "src/gitsafety/patterns.py"
   # Fixtures e casos de teste, incluindo os 900 documentos que o fuzz gera.
   - "tests/**"
   # Blueprints e planos citam os valores medidos durante a descoberta.

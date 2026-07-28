@@ -16,6 +16,51 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Security
 
+## [0.8.0] - 2026-07-28
+
+### Changed
+
+- **`gitsafety scan` passou a respeitar o `.gitignore`.** Dentro de um repositório git,
+  o alvo padrão é o que o git enxerga: arquivos rastreados mais não-rastreados que o
+  `.gitignore` não exclui. `node_modules/`, `.venv/`, `dist/`, `.terraform/` e o próprio
+  `.git/` saem da varredura sem nenhuma configuração (#8)
+- Medido num repositório real de 197 arquivos com `node_modules/` ignorado: a varredura
+  passou de **20.479 arquivos para 197**. O ganho não é tempo — é ruído: achado dentro de
+  `node_modules/` é falso positivo por definição, porque quem roda o scan não escreveu
+  aquele código e não pode corrigi-lo (#8)
+- Um arquivo ignorado mas versionado com `git add -f` continua sendo varrido: o que está
+  no repositório é o que pode vazar. Um arquivo novo, ainda não adicionado, também — é
+  onde a chave recém-colada costuma estar. E `gitsafety scan .env` num `.env` ignorado
+  funciona, porque alvo explícito é pedido explícito (#8)
+- Fora de repositório git, ou sem `git` no `PATH`, nada muda. A referência sempre disse
+  que o git só é **exigido** por `--staged` e `--history`, e o scan de disco não passou a
+  exigi-lo (#8)
+- Nada disso afeta o hook, que lê apenas as linhas staged — arquivo ignorado nunca é
+  staged (#8)
+
+### Fixed
+
+- **A configuração aplicada passou a ser a do alvo, não a do diretório de onde você
+  chama.** `gitsafety scan /outro/projeto` usava o `.gitsafety.yml` do repositório onde o
+  shell estava: o `allow:` de um projeto silenciava achados de outro — falso negativo por
+  ambiente — e um `.gitsafety.yml` legítimo do alvo era ignorado. `--staged` e `--history`
+  seguem usando o do repositório corrente, porque ali o alvo é ele mesmo, e é assim que o
+  hook invoca (#9)
+- `--config PATH` explícito continua vencendo a descoberta automática (#9)
+- **Caminho inexistente deixou de ser reportado como "git não encontrado no PATH".** O
+  `subprocess` levanta o mesmo erro para binário ausente e para diretório de trabalho
+  inexistente; traduzir os dois igual mandava o usuário instalar o git que ele já tinha,
+  em vez de conferir o caminho que digitou (#9)
+- A suíte deixou de depender do diretório de onde é executada. As mesmas provas passam
+  de dentro e de fora do repositório — antes, o `allow:` do próprio projeto derrubava 6
+  testes da CLI quando ela rodava de dentro (#9)
+- **O `ignore:` do `.gitsafety.yml` passou a valer ao varrer um subdiretório.**
+  `gitsafety scan src/` desconsiderava em silêncio a mesma linha que `gitsafety scan .`
+  respeitava, porque o glob era resolvido contra o alvo do scan em vez da raiz do
+  repositório — que é o que a referência sempre prometeu. Não era falso negativo, mas
+  configuração que funciona às vezes é pior que configuração que não existe: quem
+  escreveu acha que está protegido (#10)
+
 ## [0.7.4] - 2026-07-28
 
 ### Added

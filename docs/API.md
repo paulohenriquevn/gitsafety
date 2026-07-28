@@ -3,7 +3,7 @@
 O contrato completo: comandos, flags, configuração, códigos de saída e formato de saída.
 Para o passo a passo de quem está começando, veja o [README](../README.md).
 
-Esta é a referência da versão **0.7.4**. Mudanças estão no [CHANGELOG](../CHANGELOG.md).
+Esta é a referência da versão **0.8.0**. Mudanças estão no [CHANGELOG](../CHANGELOG.md).
 
 ---
 
@@ -65,9 +65,37 @@ enquanto configuração é escolha de quem precisa dela.
 
 | Alvo | O que examina | Consequência |
 |---|---|---|
-| *(padrão)* | Os arquivos como estão no disco | Pula binário por extensão e qualquer arquivo acima de 1 MB, e **reporta o pulo** |
+| *(padrão)* | Os arquivos que existem para o git | Pula binário por extensão e qualquer arquivo acima de 1 MB, e **reporta o pulo** |
 | `--staged` | As linhas adicionadas no índice | Um segredo que já estava no arquivo e você não tocou **não** bloqueia o commit — do contrário, adotar a ferramenta num repositório com história bloquearia tudo |
 | `--history` | As linhas adicionadas em todo o histórico | Encontra o que já foi commitado, mesmo que o arquivo tenha sido apagado depois |
+
+#### O alvo padrão respeita o `.gitignore`
+
+Dentro de um repositório git, o alvo padrão é o que o git enxerga: rastreados mais
+não-rastreados que o `.gitignore` não exclui. `node_modules/`, `.venv/`, `dist/`,
+`.terraform/` e o próprio `.git/` saem da varredura sem você configurar nada.
+
+Não é otimização — é ruído. Achado dentro de `node_modules/` é falso positivo por
+definição: você não escreveu aquele código e não pode corrigi-lo.
+
+| Situação | O que acontece |
+|---|---|
+| Fora de repositório git | Varre o disco, como sempre |
+| `git` ausente do `PATH` | Varre o disco — o git só é **exigido** por `--staged` e `--history` |
+| Arquivo ignorado, mas versionado com `git add -f` | **Varrido.** O que está no repositório é o que pode vazar |
+| Arquivo novo, ainda não adicionado | **Varrido.** É onde a chave recém-colada costuma estar |
+| `gitsafety scan .env` num `.env` ignorado | **Varrido.** Alvo explícito é pedido explícito |
+
+O que se perde: um `.env` gitignorado com credencial real não aparece no `scan` de pasta.
+Ele também nunca seria commitado, que é o que a ferramenta existe para impedir — e
+apontar o caminho direto continua funcionando. A decisão está em
+[ADR 0003](../knowledge-base/adrs/0003-o-que-o-git-ignora-o-scan-tambem-ignora.md).
+
+#### A configuração é a do alvo
+
+`gitsafety scan /outro/projeto` usa o `.gitsafety.yml` de `/outro/projeto`, não o do
+diretório de onde você chamou. `--staged` e `--history` continuam usando o do
+repositório corrente, porque ali o alvo é ele mesmo.
 
 ---
 
@@ -134,7 +162,8 @@ segredos vai para logs de CI, terminais compartilhados e capturas de tela.
 Opcional. Sem arquivo nenhum a ferramenta funciona com os padrões embutidos — configuração é
 para reduzir ruído, nunca para habilitar a detecção.
 
-Procurado como `.gitsafety.yml` na raiz do repositório, ou apontado por `--config PATH`.
+Procurado como `.gitsafety.yml` na raiz do repositório **que está sendo varrido**, ou
+apontado por `--config PATH`.
 
 ```yaml
 # Todas as três chaves são opcionais.

@@ -324,3 +324,63 @@ def test_history_outside_a_repository_fails_clearly(capsys, tmp_path, monkeypatc
     monkeypatch.chdir(tmp_path)
     assert main(["scan", "--history"]) == 2
     assert "repositório" in capsys.readouterr().err.lower()
+
+
+# --- A config é a do alvo, não a de onde você está (#9) --------------------------
+
+
+def _repo(base, nome):
+    import subprocess
+
+    d = base / nome
+    d.mkdir()
+    subprocess.run(["git", "init", "-q", str(d)], check=True, capture_output=True)
+    return d
+
+
+def test_config_of_the_caller_does_not_silence_the_target(tmp_path, monkeypatch):
+    """O `allow:` de um repositório não pode calar o achado de outro.
+
+    Falso negativo por ambiente é o pior modo de falha deste produto: quem varre o repo
+    do vizinho recebe "nenhum segredo encontrado" porque o SEU repositório tinha um
+    `allow:` sem nenhuma relação com o alvo.
+    """
+    de_onde_chamo = _repo(tmp_path, "a")
+    (de_onde_chamo / ".gitsafety.yml").write_text(
+        f'allow:\n  - "{SECRET}"\n', encoding="utf-8"
+    )
+    alvo = _repo(tmp_path, "b")
+    (alvo / "config.py").write_text(f'API_KEY = "{SECRET}"\n', encoding="utf-8")
+
+    monkeypatch.chdir(de_onde_chamo)
+
+    assert main(["scan", str(alvo)]) == ExitCode.SECRETS_FOUND
+
+
+def test_the_targets_own_config_is_the_one_that_applies(tmp_path, monkeypatch):
+    """E o inverso: o `allow:` do alvo vale mesmo chamando de fora.
+
+    Sem este par, a correção poderia ser "ignore toda config quando há caminho" — que
+    conserta o falso negativo criando um falso positivo.
+    """
+    de_onde_chamo = _repo(tmp_path, "a")
+    alvo = _repo(tmp_path, "b")
+    (alvo / ".gitsafety.yml").write_text(f'allow:\n  - "{SECRET}"\n', encoding="utf-8")
+    (alvo / "config.py").write_text(f'API_KEY = "{SECRET}"\n', encoding="utf-8")
+
+    monkeypatch.chdir(de_onde_chamo)
+
+    assert main(["scan", str(alvo)]) == ExitCode.SUCCESS
+
+
+def test_explicit_config_flag_still_wins(tmp_path, monkeypatch):
+    """`--config PATH` é pedido direto e continua vencendo a descoberta automática."""
+    alvo = _repo(tmp_path, "b")
+    (alvo / ".gitsafety.yml").write_text(f'allow:\n  - "{SECRET}"\n', encoding="utf-8")
+    (alvo / "config.py").write_text(f'API_KEY = "{SECRET}"\n', encoding="utf-8")
+    vazia = tmp_path / "vazia.yml"
+    vazia.write_text("ignore: []\n", encoding="utf-8")
+
+    monkeypatch.chdir(tmp_path)
+
+    assert main(["scan", str(alvo), "--config", str(vazia)]) == ExitCode.SECRETS_FOUND

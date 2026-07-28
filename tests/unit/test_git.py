@@ -13,7 +13,12 @@ import subprocess
 
 import pytest
 
-from gitsafety.errors import ExitCode, GitUnavailableError, NotAGitRepositoryError
+from gitsafety.errors import (
+    ExitCode,
+    GitUnavailableError,
+    NotAGitRepositoryError,
+    PathNotFoundError,
+)
 from gitsafety.git import hooks_dir, is_git_repository, repo_root, run_git
 
 
@@ -114,3 +119,19 @@ def test_git_timeout_raises_a_typed_error(tmp_path, monkeypatch):
         run_git(["log"], cwd=tmp_path)
 
     assert "tempo" in exc.value.message.lower() or "timeout" in exc.value.message.lower()
+
+
+def test_a_missing_cwd_is_not_reported_as_a_missing_git(tmp_path):
+    """Dois `FileNotFoundError` diferentes do subprocess, dois erros diferentes.
+
+    `subprocess.run` levanta o mesmo `FileNotFoundError` quando o binário não existe e
+    quando o `cwd` não existe. Traduzir os dois para "git não encontrado no PATH" manda
+    o usuário procurar o problema no lugar errado — ele vai instalar o git que já tem,
+    em vez de conferir o caminho que digitou.
+    """
+    inexistente = tmp_path / "fantasma"
+
+    with pytest.raises(PathNotFoundError) as exc:
+        run_git(["rev-parse", "--git-dir"], cwd=inexistente)
+
+    assert "fantasma" in str(exc.value)
