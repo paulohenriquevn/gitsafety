@@ -153,3 +153,48 @@ def test_the_version_the_cli_prints_is_the_version_of_the_package(projeto):
     ).stdout.strip()
 
     assert impressa == f"gitsafety {projeto['version']}"
+
+
+#: Marcadores que o README usou para dizer "isto ainda não existe".
+_MARCADORES_DE_PENDENCIA = ("em construção", "⏳", "em breve", "planejado", "TODO")
+
+
+def test_no_shipped_flag_is_marked_as_pending():
+    """Uma flag que existe não pode estar anunciada como pendente.
+
+    Os dois testes acima comparam **presença**: flag documentada que não existe, e flag que
+    existe sem documentação. Nenhum dos dois olha o que o texto **afirma** ao lado da flag —
+    e foi exatamente por aí que passou uma linha dizendo `--history ⏳ em construção` por
+    duas versões depois de a flag ter sido lançada.
+
+    Mentir dizendo que algo não existe é mais barato que o contrário, mas custa igual: quem
+    lê o README decide não usar um recurso que está pronto.
+    """
+    readme = (RAIZ / "README.md").read_text(encoding="utf-8")
+
+    mentiras = [
+        (flag, linha.strip())
+        for linha in readme.splitlines()
+        if any(marcador in linha for marcador in _MARCADORES_DE_PENDENCIA)
+        for flag in _flags_da_cli()
+        if flag in linha
+    ]
+
+    assert not mentiras, f"flags que existem, anunciadas como pendentes: {mentiras}"
+
+
+def test_the_readme_has_no_leftover_pending_markers():
+    """Nenhum marcador de pendência sobrando — nem a legenda que explicava um deles.
+
+    Quando o último item pendente é entregue, a legenda vira ruído que sugere que ainda há
+    algo por vir.
+    """
+    readme = (RAIZ / "README.md").read_text(encoding="utf-8")
+
+    sobrando = [
+        linha.strip()
+        for linha in readme.splitlines()
+        if any(marcador in linha for marcador in _MARCADORES_DE_PENDENCIA)
+    ]
+
+    assert not sobrando, f"marcadores de pendência no README: {sobrando}"

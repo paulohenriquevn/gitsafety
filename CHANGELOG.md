@@ -16,6 +16,16 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Security
 
+## [0.7.2] - 2026-07-27
+
+### Fixed
+
+- **O README anunciava `--history` como "em construção".** A flag foi lançada na 0.6.0 e a
+  tabela de flags ficou duas versões dizendo que ela ainda não existia — quem leu decidiu
+  não usar um recurso que estava pronto
+- A seção de flags passou a listar as quatro do `scan` sem marcadores de status, e explica
+  que `--staged` e `--history` são alvos mutuamente exclusivos
+
 ## [0.7.1] - 2026-07-27
 
 ### Fixed

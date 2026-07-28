@@ -295,23 +295,26 @@ vazamento. `--show-secrets` mostra o valor completo quando você realmente preci
 ## Todas as flags
 
 ```
-gitsafety install              instala o hook de pre-commit             ✅ disponível
-gitsafety scan [CAMINHO]       verifica arquivos                        ✅ disponível
-  --staged                     apenas os arquivos em stage              ✅ disponível
-  --show-secrets               mostra o segredo completo                ✅ disponível
-gitsafety --version                                                     ✅ disponível
-
-  --config PATH                arquivo de config (padrão: .gitsafety.yml) ✅ disponível
-
-  --history                    também o histórico do git                ⏳ em construção
+gitsafety install              instala o hook de pre-commit
+gitsafety scan [CAMINHO]       verifica arquivos
+  --staged                     apenas o que está no index do git
+  --history                    o histórico do git, em vez do disco
+  --show-secrets               mostra o segredo completo
+  --config PATH                arquivo de config (padrão: .gitsafety.yml)
+gitsafety --version            mostra a versão instalada
 ```
 
-Quatro flags no total. Se você sentir falta de uma quinta, provavelmente o caso é do
-`.gitsafety.yml`.
+**Quatro flags no `scan`, e é o teto.** Se você sentir falta de uma quinta, o caso
+provavelmente é do `.gitsafety.yml` — flag é interface que todo mundo carrega para sempre;
+configuração é escolha de quem precisa dela.
 
-> **⏳ em construção** = faz parte do contrato do produto e ainda não foi implementado.
-> `gitsafety scan --help` sempre lista **apenas** o que existe de verdade no binário que
-> você instalou — nenhuma flag anunciada na ajuda deixa de funcionar.
+`--staged` e `--history` são alvos e por isso mutuamente exclusivos: o primeiro olha o que
+você está commitando, o segundo o que já foi commitado, e sem nenhum dos dois ele olha o
+disco.
+
+Esta lista é a lista inteira. `gitsafety scan --help` mostra exatamente estas flags, e um
+teste da suíte compara as duas nas duas direções a cada execução — flag documentada que não
+existe, e flag que existe sem documentação.
 
 ---
 
