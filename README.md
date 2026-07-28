@@ -6,8 +6,8 @@ Um comando para instalar, um YAML para ajustar. Funciona em repositório git, em
 pasta solta e em notebook Jupyter.
 
 > **Status:** pré-1.0. Publicado no PyPI e funcional — instale e use. O `1.0.0` fica
-> reservado para depois de uso sustentado em trabalho real, conforme
-> `.claude/rules/public-copy.md § 3`; testes e review não são evidência de uso.
+> reservado para depois de uso sustentado em trabalho real. Testes e revisão provam
+> **corretude**; `1.0.0` deveria significar **uso**, e são coisas diferentes.
 
 ---
 
@@ -66,7 +66,7 @@ inteiro, e nem mesmo o arquivo inteiro. Para conteúdo de texto, medido: o commi
 
 Commitar **binário** é outra história: o hook lê o conteúdo para não deixar um segredo
 passar disfarçado de arquivo binário, e isso custa. Medido: 30 MB de binário no mesmo
-commit levam ~5,7 s. Não é o caso comum — mas se o seu primeiro commit com a ferramenta
+commit levam ~4,5 s. Não é o caso comum — mas se o seu primeiro commit com a ferramenta
 inclui uma pasta de assets, é bom saber. Ponha o caminho em `ignore:` se ele nunca vai
 conter credencial.
 
@@ -91,10 +91,9 @@ logo abaixo.
 Ela tem fronteira, e vale saber qual. **Não** pega: valor em outra linha, valor montado por
 concatenação, senha com símbolo nos primeiros 20 caracteres (`"S3nh4@Sup3r..."`), senha só
 de letras, e nomes que ela não conhece (`pwd`, `credential`). **Pega às vezes demais:**
-anotação de tipo em Python (`private_key: PKCS7PrivateKeyTypes`) <!-- gitsafety: allow -->
-tem a mesma forma de um
-segredo em YAML — 3 ocorrências em 1,3 milhão de linhas de código real. Para essas, use
-`allow:` ou `ignore:`.
+anotação de tipo em Python tem a mesma forma de um segredo em YAML, e a regra não distingue
+as duas <!-- gitsafety: allow -->. Foram 3 ocorrências em 1,3 milhão de linhas de código
+real. Para essas, use `allow:` ou `ignore:`.
 
 ---
 
@@ -162,15 +161,25 @@ histórico de todo mundo que já clonou o repositório.
 Um segredo que aparece em vários commits vira **um** achado, com a contagem ao lado quando
 foi reintroduzido depois de sair.
 
-O custo é proporcional às linhas do histórico, não aos commits. No próprio repositório do
-gitsafety — 51 commits, 74 mil linhas adicionadas — leva cerca de 6 segundos. É um comando
-para rodar de vez em quando, não a cada commit; para isso existe o hook.
+O custo é proporcional às **linhas** do histórico, não aos commits. No próprio repositório
+do gitsafety — 74 commits, 77 mil linhas adicionadas — leva cerca de 2,5 segundos
+([benchmark](benchmarks/bench_history.py)). É um comando para rodar de vez em quando, não a
+cada commit; para isso existe o hook.
 
-**O que ele não vê.** Se você reescreveu o histórico — `git reset`, `git commit --amend`,
-`rebase` — o commit antigo some das referências, e o `--history` não o alcança. Mas o objeto
-continua no seu repositório local por cerca de 90 dias, recuperável pelo reflog. Reescrever
-o histórico não desfaz a exposição: **revogue a chave no provedor**, que é a única ação que
-resolve.
+**O que ele não vê — e avisa.** Se você reescreveu o histórico com `git reset`, `rebase` ou
+`commit --amend`, o commit antigo saiu das referências e o `--history` não o alcança. Ele
+diz isso em vez de deixar você concluir que está limpo:
+
+```
+Nenhum segredo encontrado.
+
+Atenção: 1 commit reescrito não foi verificado.
+Se foi para remover uma chave, revogue-a: reescrever não desfaz a exposição.
+```
+
+O objeto continua no seu repositório local por cerca de 90 dias, recuperável pelo reflog. E
+reescrever o histórico nunca desfez uma exposição: **revogar a chave no provedor** é a única
+ação que resolve.
 
 ---
 
