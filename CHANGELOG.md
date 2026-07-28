@@ -16,6 +16,17 @@ Formato: [Keep a Changelog](https://keepachangelog.com/) · Versionamento: [SemV
 
 ### Security
 
+## [0.7.1] - 2026-07-27
+
+### Fixed
+
+- **Números de desempenho do README corrigidos.** O custo do `scan --history` estava
+  publicado como ~6 s e o real é ~2,5 s — a medição original foi feita com a máquina
+  carregada, e o número dizia mais sobre isso do que sobre o comando. O custo com binário
+  também foi refeito (~4,5 s para 30 MB). Ambos agora linkam o benchmark que os sustenta
+- O README passou a mostrar que o `scan --history` **avisa** sobre commits reescritos que
+  ele não alcança — o aviso existe desde a versão anterior e a documentação não contava
+
 ## [0.7.0] - 2026-07-27
 
 ### Added
