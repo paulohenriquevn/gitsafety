@@ -1,42 +1,45 @@
 # gitsafety
 
-**Não deixa você commitar uma chave de API.**
+**Stops you from committing an API key.**
 
-Você instala uma vez, e a partir daí o `git commit` avisa antes de a credencial sair da sua
-máquina. Funciona em repositório git, em pasta solta e em notebook Jupyter.
+Install it once, and from then on `git commit` warns you before a credential leaves your
+machine. Works in git repositories, in loose folders and in Jupyter notebooks.
 
-> **Status:** pré-1.0. Publicado no PyPI e funcional — instale e use. O `1.0.0` fica
-> reservado para depois de uso sustentado em trabalho real. Testes e revisão provam
-> **corretude**; `1.0.0` deveria significar **uso**, e são coisas diferentes.
+> **Status:** pre-1.0. Published on PyPI and working — install it and use it. `1.0.0` is
+> reserved for after sustained use in real work. Tests and review prove **correctness**;
+> `1.0.0` should mean **use**, and those are different things.
+
+> **Language note:** the CLI currently prints its messages in Portuguese. The output samples
+> below are verbatim.
 
 ---
 
-## Começando — 3 passos
+## Getting started — 3 steps
 
-Precisa de Python 3.10 ou mais novo. Nada de Docker, nada para compilar, nada para subir.
+You need Python 3.10 or newer. No Docker, nothing to compile, nothing to run in the background.
 
-### 1. Instale
+### 1. Install
 
 ```bash
 pipx install gitsafety
 ```
 
-Se não tiver o `pipx`: `python3 -m pip install --user pipx && python3 -m pipx ensurepath`.
+If you don't have `pipx`: `python3 -m pip install --user pipx && python3 -m pipx ensurepath`.
 
 <details>
-<summary>Prefere <code>pip</code> num ambiente virtual? Leia isto antes.</summary>
+<summary>Prefer <code>pip</code> in a virtual environment? Read this first.</summary>
 
-`pip install gitsafety` funciona, mas o hook chama `gitsafety` pelo PATH **na hora do
-commit**. Se o ambiente virtual não estiver ativo naquele momento, **todo commit falha** com
-`gitsafety: not found`. O `pipx` deixa o comando disponível sempre.
+`pip install gitsafety` works, but the hook calls `gitsafety` from the PATH **at commit
+time**. If the virtual environment is not active at that moment, **every commit fails** with
+`gitsafety: not found`. `pipx` keeps the command available at all times.
 
-Descobrimos isso instalando no nosso próprio repositório — está registrado em
+We found this out by installing it in our own repository — it is recorded in
 [`knowledge-base/dogfood/`](knowledge-base/dogfood/).
 </details>
 
-### 2. Ligue no seu projeto
+### 2. Turn it on in your project
 
-Dentro da pasta do repositório, uma vez só:
+Inside the repository folder, just once:
 
 ```bash
 gitsafety install
@@ -48,10 +51,10 @@ gitsafety install
   Emergência: git commit --no-verify
 ```
 
-### 3. Trabalhe normalmente
+### 3. Work as usual
 
-Não há passo 4. O `git commit` continua sendo `git commit` — a diferença aparece só quando
-há uma credencial no que você está enviando:
+There is no step 4. `git commit` is still `git commit` — the difference only shows up when
+there is a credential in what you are committing:
 
 ```console
 $ git commit -m "adiciona cliente S3"
@@ -62,18 +65,18 @@ $ git commit -m "adiciona cliente S3"
   Revogue a chave no provedor antes de qualquer outra coisa.
 ```
 
-O commit **não** aconteceu. Tire a chave do código (use variável de ambiente, cofre, o que
-o seu time usar), commite de novo, e pronto.
+The commit did **not** happen. Take the key out of the code (use an environment variable, a
+vault, whatever your team uses), commit again, and you're done.
 
-> **Por que "revogue a chave" e não "apague a linha".** Se a chave já saiu da sua máquina
-> alguma vez, apagá-la do código não a desativa. Quem a copiou continua com ela. Revogar no
-> provedor é a única ação que resolve de verdade — o resto é limpeza.
+> **Why "revoke the key" and not "delete the line".** If the key has ever left your machine,
+> deleting it from the code does not deactivate it. Whoever copied it still has it. Revoking it
+> at the provider is the only action that actually fixes it — the rest is cleanup.
 
 ---
 
-## Já commitei uma chave antes de instalar. E agora?
+## I committed a key before installing. Now what?
 
-O hook protege daqui para frente. Para olhar para trás:
+The hook protects you from now on. To look back:
 
 ```bash
 gitsafety scan --history
@@ -88,112 +91,110 @@ gitsafety scan --history
   Remover o arquivo agora NÃO apaga o segredo do histórico.
 ```
 
-Ele mostra **quando a chave entrou e por quem** — é o que decide a urgência. E funciona
-mesmo que o arquivo já tenha sido apagado: o histórico do git lembra, e qualquer pessoa que
-clonou o repositório também.
+It shows **when the key came in and who added it** — that is what decides the urgency. And it
+works even if the file has already been deleted: git history remembers, and so does everyone
+who cloned the repository.
 
 ---
 
-## Os três comandos, e quando usar cada um
+## The three commands, and when to use each
 
-| Comando | O que olha | Quando você usa |
+| Command | What it looks at | When you use it |
 |---|---|---|
-| `gitsafety install` | — | Uma vez por repositório, no começo |
-| *(o hook, sozinho)* | o que você está commitando | Automático, a cada `git commit` |
-| `gitsafety scan` | os arquivos da pasta agora | Antes de abrir um PR, ou por curiosidade |
-| `gitsafety scan --history` | tudo que já foi commitado | Ao adotar num projeto que já existe |
+| `gitsafety install` | — | Once per repository, at the start |
+| *(the hook, on its own)* | what you are committing | Automatically, on every `git commit` |
+| `gitsafety scan` | the files in the folder right now | Before opening a PR, or out of curiosity |
+| `gitsafety scan --history` | everything ever committed | When adopting it in an existing project |
 
-Emergência: `git commit --no-verify` passa por cima do hook. Existe porque bloquear alguém
-sem saída faz a pessoa desinstalar a ferramenta.
+Emergency: `git commit --no-verify` bypasses the hook. It exists because blocking someone
+with no way out makes them uninstall the tool.
 
-Este README é o guia de uso. A referência completa da CLI está em
+This README is the user guide. The full CLI reference is in
 [`docs/API.md`](docs/API.md).
 
 ---
 
-## Por que ele não enche o saco
+## Why it doesn't get in your way
 
-O hook verifica **apenas as linhas que você está introduzindo** — não o repositório
-inteiro, e nem mesmo o arquivo inteiro. Para conteúdo de texto, medido: o commit fica
-**~0,04 s** mais lento, independente de tocar 1 ou 200 arquivos
-([benchmark](benchmarks/bench_hook.py)).
+The hook checks **only the lines you are introducing** — not the whole repository, and not
+even the whole file. For text content, measured: the commit gets **~0.04 s** slower,
+regardless of whether it touches 1 or 200 files ([benchmark](benchmarks/bench_hook.py)).
 
-Commitar **binário** é outra história: o hook lê o conteúdo para não deixar um segredo
-passar disfarçado de arquivo binário, e isso custa. Medido: 30 MB de binário no mesmo
-commit levam ~4,5 s. Não é o caso comum — mas se o seu primeiro commit com a ferramenta
-inclui uma pasta de assets, é bom saber. Ponha o caminho em `ignore:` se ele nunca vai
-conter credencial.
+Committing **binaries** is another story: the hook reads the content so that a secret cannot
+slip through disguised as a binary file, and that has a cost. Measured: 30 MB of binaries in
+the same commit take ~4.5 s. It is not the common case — but if your first commit with the
+tool includes an assets folder, it is good to know. Put the path under `ignore:` if it will
+never contain a credential.
 
-Isso tem uma consequência que vale saber: se um arquivo **já tinha** um segredo commitado
-antes e você edita outra linha dele, o hook não reclama. É deliberado — do contrário,
-adotar a ferramenta num repositório com história bloquearia todo commit até alguém
-limpar o passado. Para achar o que já está lá, use `gitsafety scan` na pasta inteira.
+This has a consequence worth knowing: if a file **already had** a committed secret and you
+edit another line of it, the hook does not complain. That is deliberate — otherwise, adopting
+the tool in a repository with history would block every commit until someone cleaned up the
+past. To find what is already there, run `gitsafety scan` on the whole folder.
 
-E ele só dispara em **padrão conhecido de credencial** — `AKIA` seguido de 16
-maiúsculas é uma chave da AWS, não tem outra leitura. Nada de heurística de
-"parece aleatório", que é o que enche relatório de falso positivo e faz o time
-desligar a ferramenta na segunda semana.
+And it only fires on a **known credential pattern** — `AKIA` followed by 16 uppercase
+characters is an AWS key; there is no other reading. No "looks random" heuristics, which is
+what fills reports with false positives and makes the team turn the tool off in the second
+week.
 
-A única regra que olha o **contexto** em vez do valor é a genérica: ela exige o nome da
-variável (`password`, `api_key`, `aws_secret_access_key`…), o operador de atribuição, e um
-valor de 20+ caracteres **com dígito e letra**. Isso é o que separa uma credencial de um
-identificador de código — `secret_key = settings.SECRET_KEY` não casa, `token = os.environ[...]`
-não casa. Medido: **zero** falsos positivos em 72.570 linhas de código dos projetos de
-referência, e **3** num corpus maior de 1,3 milhão de linhas — a classe deles está descrita
-logo abaixo.
+The only rule that looks at **context** instead of the value is the generic one: it requires
+the variable name (`password`, `api_key`, `aws_secret_access_key`…), the assignment operator,
+and a value of 20+ characters **with a digit and a letter**. That is what separates a credential
+from a code identifier — `secret_key = settings.SECRET_KEY` does not match,
+`token = os.environ[...]` does not match. Measured: **zero** false positives in 72,570 lines of
+code from the reference projects, and **3** in a larger corpus of 1.3 million lines — their
+class is described right below.
 
-Ela tem fronteira, e vale saber qual. **Não** pega: valor em outra linha, valor montado por
-concatenação, senha com símbolo nos primeiros 20 caracteres (`"S3nh4@Sup3r..."`), senha só
-de letras, e nomes que ela não conhece (`pwd`, `credential`). **Pega às vezes demais:**
-anotação de tipo em Python tem a mesma forma de um segredo em YAML, e a regra não distingue
-as duas <!-- gitsafety: allow -->. Foram 3 ocorrências em 1,3 milhão de linhas de código
-real. Para essas, use `allow:` ou `ignore:`.
+It has a boundary, and it is worth knowing where. It does **not** catch: a value on another line,
+a value built by concatenation, a password with a symbol in its first 20 characters
+(`"S3nh4@Sup3r..."`), a letters-only password, and names it does not know (`pwd`,
+`credential`). It **sometimes catches too much:** a Python type annotation has the same shape as
+a secret in YAML, and the rule cannot tell the two apart <!-- gitsafety: allow -->. That was 3
+occurrences in 1.3 million lines of real code. For those, use `allow:` or `ignore:`.
 
 ---
 
-## O que ele detecta
+## What it detects
 
-Sem configurar nada:
+With zero configuration:
 
-| Categoria | Regras | Exemplos |
+| Category | Rules | Examples |
 |---|---|---|
 | Cloud | 8 | AWS, Google Cloud, Azure, DigitalOcean, Heroku, Cloudflare |
-| Git / pacotes | 11 | GitHub (`ghp_`, `github_pat_`, `gho_`, `ghs_`, `ghr_`), GitLab, npm, PyPI, RubyGems, crates.io |
-| IA e dados | 6 | OpenAI (`sk-`), Anthropic (`sk-ant-`), Hugging Face, Cohere, Replicate, W&B |
-| Pagamentos e SaaS | 19 | Stripe, Twilio, SendGrid, Slack, Sentry, Shopify, Atlassian, Linear, JWT |
-| Chaves privadas | 4 | Blocos PEM, PuTTY, PKCS#8 cifrada, age |
-| Banco de dados | 5 | Strings de conexão com senha: PostgreSQL, MySQL, MongoDB, Redis, AMQP |
-| Genéricas | 1 | Credencial atribuída a variável de nome revelador: `aws_secret_access_key`, `password`, `api_key`, `token`, `client_secret`… |
+| Git / packages | 11 | GitHub (`ghp_`, `github_pat_`, `gho_`, `ghs_`, `ghr_`), GitLab, npm, PyPI, RubyGems, crates.io |
+| AI and data | 6 | OpenAI (`sk-`), Anthropic (`sk-ant-`), Hugging Face, Cohere, Replicate, W&B |
+| Payments and SaaS | 19 | Stripe, Twilio, SendGrid, Slack, Sentry, Shopify, Atlassian, Linear, JWT |
+| Private keys | 4 | PEM blocks, PuTTY, encrypted PKCS#8, age |
+| Databases | 5 | Connection strings with a password: PostgreSQL, MySQL, MongoDB, Redis, AMQP |
+| Generic | 1 | A credential assigned to a revealingly named variable: `aws_secret_access_key`, `password`, `api_key`, `token`, `client_secret`… |
 
-**54 padrões no total.** Cada um traz seus próprios exemplos de acerto e de não-acerto,
-verificados a cada execução da suíte.
+**54 patterns in total.** Each one carries its own match and non-match examples, verified on
+every run of the test suite.
 
-O que for específico do seu time entra no YAML — veja abaixo.
+Anything specific to your team goes in the YAML — see below.
 
-### Notebooks Jupyter
+### Jupyter notebooks
 
-`.ipynb` é tratado como caso de primeira classe: o gitsafety lê o JSON do notebook e
-verifica **o código das células e também as saídas salvas**. É onde a chave escapa
-com mais frequência — você apaga a célula, mas o `print(os.environ)` de três
-execuções atrás continua gravado no arquivo que vai para o commit.
+`.ipynb` is treated as a first-class case: gitsafety reads the notebook JSON and checks
+**the cell code and also the saved outputs**. That is where keys leak most often — you delete
+the cell, but the `print(os.environ)` from three runs ago is still stored in the file that is
+about to be committed.
 
-O achado aponta a **célula**, não a linha do JSON:
+A finding points to the **cell**, not to the JSON line:
 
 ```
 analise.ipynb :: célula 4 (saída):1   postgres-connection-string   post•••••••••.com
 ```
 
-Um notebook aberto no Jupyter não tem linha 50, então reportar a linha do arquivo não
-ajudaria ninguém a achar o segredo. Saídas de `print`, de resultado de célula e de
-traceback de erro são todas verificadas — o traceback de uma chamada autenticada que
-falhou costuma guardar a credencial inteira.
+A notebook open in Jupyter has no line 50, so reporting the file line would not help anyone
+find the secret. Outputs from `print`, from cell results and from error tracebacks are all
+checked — the traceback of a failed authenticated call often holds the entire credential.
 
-Notebook corrompido ou truncado não quebra a varredura: ele volta a ser lido como texto,
-porque um arquivo que o parser recusa ainda pode conter a chave.
+A corrupted or truncated notebook does not break the scan: it is read again as plain text,
+because a file the parser rejects can still contain the key.
 
-### Histórico
+### History
 
-O hook impede que a chave **entre**. Para saber se ela já entrou antes:
+The hook stops the key from **getting in**. To find out whether it already got in before:
 
 ```bash
 gitsafety scan --history
@@ -208,21 +209,21 @@ Revogue a chave no provedor antes de qualquer outra coisa.
 Remover o arquivo agora NÃO apaga o segredo do histórico.
 ```
 
-O commit mostrado é o da **introdução** — "desde quando esta chave está exposta?" é a
-pergunta que decide a urgência. Apagar o arquivo hoje não resolve: o objeto continua no
-histórico de todo mundo que já clonou o repositório.
+The commit shown is the one that **introduced** it — "how long has this key been exposed?" is
+the question that decides the urgency. Deleting the file today does not fix it: the object
+stays in the history of everyone who has already cloned the repository.
 
-Um segredo que aparece em vários commits vira **um** achado, com a contagem ao lado quando
-foi reintroduzido depois de sair.
+A secret that appears in several commits becomes **one** finding, with the count next to it
+when it was reintroduced after being removed.
 
-O custo é proporcional às **linhas** do histórico, não aos commits. No próprio repositório
-do gitsafety — 74 commits, 77 mil linhas adicionadas — leva cerca de 2,5 segundos
-([benchmark](benchmarks/bench_history.py)). É um comando para rodar de vez em quando, não a
-cada commit; para isso existe o hook.
+The cost is proportional to the **lines** in the history, not to the number of commits. On the
+gitsafety repository itself — 74 commits, 77 thousand lines added — it takes about 2.5 seconds
+([benchmark](benchmarks/bench_history.py)). It is a command to run now and then, not on every
+commit; that is what the hook is for.
 
-**O que ele não vê — e avisa.** Se você reescreveu o histórico com `git reset`, `rebase` ou
-`commit --amend`, o commit antigo saiu das referências e o `--history` não o alcança. Ele
-diz isso em vez de deixar você concluir que está limpo:
+**What it does not see — and tells you.** If you rewrote history with `git reset`, `rebase` or
+`commit --amend`, the old commit is no longer referenced and `--history` cannot reach it. It
+says so instead of letting you conclude everything is clean:
 
 ```
 Nenhum segredo encontrado.
@@ -231,184 +232,184 @@ Atenção: 1 commit reescrito não foi verificado.
 Se foi para remover uma chave, revogue-a: reescrever não desfaz a exposição.
 ```
 
-O objeto continua no seu repositório local por cerca de 90 dias, recuperável pelo reflog. E
-reescrever o histórico nunca desfez uma exposição: **revogar a chave no provedor** é a única
-ação que resolve.
+The object stays in your local repository for about 90 days, recoverable through the reflog.
+And rewriting history has never undone an exposure: **revoking the key at the provider** is the
+only action that fixes it.
 
 ---
 
-## Configuração
+## Configuration
 
-Opcional. Sem arquivo nenhum, os padrões embutidos valem. Para ajustar, crie um
-`.gitsafety.yml` na raiz do repositório:
+Optional. With no file at all, the built-in patterns apply. To adjust, create a
+`.gitsafety.yml` at the root of the repository:
 
 ```yaml
-# .gitsafety.yml — as três chaves são opcionais
+# .gitsafety.yml — all three keys are optional
 
-# Caminhos que nem são abertos (glob)
+# Paths that are never even opened (glob)
 ignore:
   - "tests/fixtures/**"
-  - "docs/exemplos/**"
+  - "docs/examples/**"
 
-# Valores conhecidos e inofensivos (texto exato ou regex)
+# Known, harmless values (exact text or regex)
 allow:
-  - "AKIAIOSFODNN7EXAMPLE"    # chave de exemplo da documentação da AWS
-  - "sk-test-.*"              # chaves do ambiente de teste do Stripe
+  - "AKIAIOSFODNN7EXAMPLE"    # example key from the AWS documentation
+  - "sk-test-.*"              # Stripe test-environment keys
 
-# Seus próprios padrões
+# Your own patterns
 rules:
-  - id: chave-interna
+  - id: internal-key
     pattern: "INTERNAL_KEY_[A-Za-z0-9]{20}"
-  - id: token-do-cliente
+  - id: customer-token
     pattern: "cli_[a-f0-9]{32}"
 ```
 
-Três chaves de topo — `ignore`, `allow`, `rules` — e nada mais. Sem herança de
-config, sem `condition: AND/OR`, sem regra composta.
+Three top-level keys — `ignore`, `allow`, `rules` — and nothing else. No config inheritance,
+no `condition: AND/OR`, no composite rules.
 
-**Chave com erro de digitação não é ignorada.** `ignroe:` para o scan e sugere `ignore:` —
-o silêncio custaria a você uma sessão de depuração descobrindo que a config nunca foi lida.
+**A misspelled key is not ignored.** `ignroe:` stops the scan and suggests `ignore:` —
+silence would cost you a debugging session discovering that the config was never read.
 
-**Seus padrões são verificados antes de rodar.** Um regex inválido vira erro com o nome da
-regra. Um regex que poderia travar a verificação no meio de um commit — como
-`(a{1,50}){1,50}` — é recusado na carga, com a explicação. É o seu commit que estaria
-pendurado.
+**Your patterns are checked before running.** An invalid regex becomes an error naming the
+rule. A regex that could hang the check in the middle of a commit — such as
+`(a{1,50}){1,50}` — is rejected at load time, with an explanation. It is your commit that
+would be hanging.
 
-YAML inválido ou regex que não compila **param o scan com erro apontando a linha**
-(exit code 2). Nunca são ignorados em silêncio.
+Invalid YAML or a regex that does not compile **stops the scan with an error pointing to the
+line** (exit code 2). They are never silently ignored.
 
-Outro arquivo: `gitsafety scan --config caminho/config.yml`.
+Another file: `gitsafety scan --config path/config.yml`.
 
-### Quer pegar senha solta também?
+### Want to catch loose passwords too?
 
-Não vem ligado, porque gera falso positivo. Se o seu time aceita a troca, cole isto
-no `rules:`:
+It is off by default because it produces false positives. If your team accepts the trade-off,
+paste this under `rules:`:
 
 ```yaml
-  - id: senha-hardcoded
-    pattern: "(?i)(password|senha|secret|token|api_key)\\s*[=:]\\s*['\"][^'\"]{8,}['\"]"
+  - id: hardcoded-password
+    pattern: "(?i)(password|secret|token|api_key)\\s*[=:]\\s*['\"][^'\"]{8,}['\"]"
 ```
 
 ---
 
-## Ignorando um finding
+## Ignoring a finding
 
-Da forma mais local para a mais ampla:
+From the most local to the broadest:
 
-**1. Na linha** — para segredo de teste commitado conscientemente:
+**1. On the line** — for a test secret committed on purpose:
 
 ```python
 API_KEY = "sk-test-4eC39HqLyjWDarjtT1zdp7dc"  # gitsafety: allow
 ```
 
-**2. Por valor** — no `allow:`, quando o mesmo valor aparece em vários arquivos.
+**2. By value** — in `allow:`, when the same value shows up in several files.
 
-**3. Por caminho** — no `ignore:`, quando a pasta inteira é irrelevante.
-
----
-
-## Sobre o hook
-
-`gitsafety install` escreve `.git/hooks/pre-commit` chamando
-`gitsafety scan --staged`. Não depende do framework `pre-commit` nem de qualquer
-outra ferramenta.
-
-Se já existir um `pre-commit` no repositório, o comando **recusa e avisa** em vez de
-sobrescrever o seu hook — ele te mostra a linha para adicionar no hook existente.
+**3. By path** — in `ignore:`, when the whole folder is irrelevant.
 
 ---
 
-## No CI
+## About the hook
 
-Qualquer runner com Python. Em GitHub Actions:
+`gitsafety install` writes `.git/hooks/pre-commit`, which calls
+`gitsafety scan --staged`. It does not depend on the `pre-commit` framework or on any
+other tool.
+
+If the repository already has a `pre-commit` hook, the command **refuses and tells you**
+instead of overwriting your hook — it shows you the line to add to the existing one.
+
+---
+
+## In CI
+
+Any runner with Python. In GitHub Actions:
 
 ```yaml
-- name: Verifica segredos
+- name: Check for secrets
   run: |
     pipx install gitsafety
     gitsafety scan --history
 ```
 
-Exit code 1 quando encontra segredo, o que já reprova o job.
+Exit code 1 when it finds a secret, which already fails the job.
 
 ---
 
-## Saída e exit codes
+## Output and exit codes
 
-O segredo aparece **mascarado por padrão** — o relatório não pode virar o próximo
-vazamento. `--show-secrets` mostra o valor completo quando você realmente precisa.
+Secrets are **masked by default** — the report must not become the next leak.
+`--show-secrets` shows the full value when you really need it.
 
-| Exit code | Significado |
+| Exit code | Meaning |
 |---|---|
-| `0` | Nada encontrado |
-| `1` | Segredo encontrado |
-| `2` | Erro (config inválida, caminho inexistente, não é repositório git) |
+| `0` | Nothing found |
+| `1` | Secret found |
+| `2` | Error (invalid config, path does not exist, not a git repository) |
 
 ---
 
-## Todas as flags
+## All flags
 
 ```
-gitsafety install              instala o hook de pre-commit
-gitsafety scan [CAMINHO]       verifica arquivos
-  --staged                     apenas o que está no index do git
-  --history                    o histórico do git, em vez do disco
-  --show-secrets               mostra o segredo completo
-  --config PATH                arquivo de config (padrão: .gitsafety.yml)
-gitsafety --version            mostra a versão instalada
+gitsafety install              installs the pre-commit hook
+gitsafety scan [PATH]          checks files
+  --staged                     only what is in the git index
+  --history                    the git history, instead of the disk
+  --show-secrets               shows the full secret
+  --config PATH                config file (default: .gitsafety.yml)
+gitsafety --version            shows the installed version
 ```
 
-**Quatro flags no `scan`, e é o teto.** Se você sentir falta de uma quinta, o caso
-provavelmente é do `.gitsafety.yml` — flag é interface que todo mundo carrega para sempre;
-configuração é escolha de quem precisa dela.
+**Four flags on `scan`, and that is the ceiling.** If you miss a fifth one, the case most likely
+belongs in `.gitsafety.yml` — a flag is interface everyone carries forever; configuration is
+a choice made by whoever needs it.
 
-`--staged` e `--history` são alvos e por isso mutuamente exclusivos: o primeiro olha o que
-você está commitando, o segundo o que já foi commitado, e sem nenhum dos dois ele olha o
-disco.
+`--staged` and `--history` are targets and therefore mutually exclusive: the first looks at
+what you are committing, the second at what has already been committed, and with neither it
+looks at the disk.
 
-Esta lista é a lista inteira. `gitsafety scan --help` mostra exatamente estas flags, e um
-teste da suíte compara as duas nas duas direções a cada execução — flag documentada que não
-existe, e flag que existe sem documentação.
+This list is the whole list. `gitsafety scan --help` shows exactly these flags, and a test in
+the suite compares the two in both directions on every run — a documented flag that does not
+exist, and a flag that exists without documentation.
 
-O contrato completo — cada código de saída, cada campo da saída, cada chave de configuração
-e o que acontece quando ela está errada — está em [`docs/API.md`](docs/API.md).
-
----
-
-## O que o gitsafety **não** faz
-
-Fora de escopo de propósito — cada item é complexidade que o público não pediu:
-
-- **Não remove o segredo do histórico.** Detectar e reescrever histórico são
-  problemas diferentes; reescrita é destrutiva e fica com `git filter-repo` / BFG.
-- **Não é cofre de senhas** nem rotaciona credenciais.
-- **Não escaneia dentro de `.zip` / `.tar.gz`** nem decodifica base64 e hex.
-- **Não usa entropia** nem herança de config, regra composta ou `condition AND/OR`.
-- **Não emite CSV, JUnit, SARIF nem template** — saída humana e exit code.
-- **Não roda como serviço** nem tem imagem Docker.
-
-Precisa de algo dessa lista? [gitleaks](https://github.com/gitleaks/gitleaks) e
-[trufflehog](https://github.com/trufflesecurity/trufflehog) cobrem esse território —
-é a recomendação honesta.
+The full contract — every exit code, every output field, every configuration key and what
+happens when it is wrong — is in [`docs/API.md`](docs/API.md).
 
 ---
 
-## Regra número um
+## What gitsafety does **not** do
 
-Segredo detectado é segredo **comprometido**. Apagar a linha, refazer o commit ou
-adicionar ao `allow:` não desfaz a exposição.
+Out of scope on purpose — each item is complexity nobody asked for:
 
-1. **Revogue e rotacione a chave** no provedor.
-2. Só depois limpe o código.
+- **It does not remove the secret from history.** Detecting and rewriting history are
+  different problems; rewriting is destructive and belongs to `git filter-repo` / BFG.
+- **It is not a password vault** and does not rotate credentials.
+- **It does not scan inside `.zip` / `.tar.gz`** nor decode base64 and hex.
+- **It does not use entropy**, config inheritance, composite rules or `condition AND/OR`.
+- **It does not emit CSV, JUnit, SARIF or templates** — human output and an exit code.
+- **It does not run as a service** and has no Docker image.
 
-O gitsafety encontra; quem fecha a porta é você.
+Need something from this list? [gitleaks](https://github.com/gitleaks/gitleaks) and
+[trufflehog](https://github.com/trufflesecurity/trufflehog) cover that territory —
+that is the honest recommendation.
 
 ---
 
-## Licença
+## Rule number one
 
-Implementação própria, sob licença MIT (ver `LICENSE`).
+A detected secret is a **compromised** secret. Deleting the line, redoing the commit or
+adding it to `allow:` does not undo the exposure.
 
-A abordagem de hook de pre-commit com catálogo de padrões conhecidos é prática
-consagrada na área — [gitleaks](https://github.com/gitleaks/gitleaks) é a referência
-mais completa. Nenhum código foi copiado.
+1. **Revoke and rotate the key** at the provider.
+2. Only then clean up the code.
+
+gitsafety finds it; closing the door is up to you.
+
+---
+
+## License
+
+Original implementation, under the MIT license (see `LICENSE`).
+
+The pre-commit hook approach with a catalog of known patterns is established practice in the
+field — [gitleaks](https://github.com/gitleaks/gitleaks) is the most complete reference. No
+code was copied.
