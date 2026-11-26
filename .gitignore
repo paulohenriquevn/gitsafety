@@ -32,3 +32,6 @@ coverage.xml
 # SO / editor
 .DS_Store
 *.swp
+
+# Personal tooling, never versioned
+.claude/
